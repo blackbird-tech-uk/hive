@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from hive.core.config import settings
 from hive.db.base import Base
 from hive.modules.devices.models import Device  # noqa: F401
+from hive.modules.events.models import Event  # noqa: F401
 
 config = context.config
 

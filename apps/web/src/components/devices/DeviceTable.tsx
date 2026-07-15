@@ -5,6 +5,7 @@ import { StatusBadge } from './StatusBadge'
 
 interface DeviceTableProps {
   devices: Device[]
+  onSelectDevice: (device: Device) => void
 }
 
 function formatLabel(value: string): string {
@@ -14,7 +15,10 @@ function formatLabel(value: string): string {
     .join(' ')
 }
 
-export function DeviceTable({ devices }: DeviceTableProps) {
+export function 
+DeviceTable({ devices, 
+    onSelectDevice 
+}: DeviceTableProps) {
   return (
     <div className="device-table-wrapper">
       <table className="device-table">
@@ -31,7 +35,11 @@ export function DeviceTable({ devices }: DeviceTableProps) {
 
         <tbody>
           {devices.map((device) => (
-            <tr key={device.id}>
+            <tr
+  className="device-table-row"
+  key={device.id}
+  onClick={() => onSelectDevice(device)}
+>
               <td>
                 <div className="device-identity">
                   <div className="device-icon">

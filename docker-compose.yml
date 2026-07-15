@@ -10,7 +10,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hive} -d ${POSTGRES_DB:-hive}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-hive} -d ${POSTGRES_DB:-hive}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -18,6 +22,12 @@ services:
   api:
     build:
       context: ./apps/api
+    command: >
+      uvicorn hive.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --app-dir /app/src
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://hive:hive_local_password@postgres:5432/hive}
       ENVIRONMENT: ${ENVIRONMENT:-development}
@@ -30,7 +40,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: uvicorn hive.main:app --host 0.0.0.0 --port 8000 --reload
 
   web:
     build:

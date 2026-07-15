@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { DeviceTable } from "../components/devices/DeviceTable";
+import { DeviceDetails } from '../components/devices/DeviceDetails';
 import { StatCard } from "../components/dashboard/StatCard";
 import { TopBar } from "../components/layout/TopBar";
 import { getDevices, type Device } from "../lib/api";
 
 export function DevicesPage() {
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,7 +77,17 @@ export function DevicesPage() {
         />
       </section>
 
-      <DeviceTable devices={devices} />
-    </>
-  );
+      <DeviceTable
+        devices={devices}
+        onSelectDevice={setSelectedDevice}
+      />
+
+      {selectedDevice && (
+        <DeviceDetails
+          device={selectedDevice}
+          onClose={() => setSelectedDevice(null)}
+        />
+      )}
+        </>
+  )
 }
