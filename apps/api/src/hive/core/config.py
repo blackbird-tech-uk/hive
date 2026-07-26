@@ -21,7 +21,7 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:5173"]
     )
 
-    jwt_secret_key: str = "change-this-before-production"
+    jwt_secret_key: str = "H-e2JvC_RmwGQrqo54A9cmbqvhWrMZPqJe0lXG0W0OYIF5z9cxxq8pgqtgiNfcRF"
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
 

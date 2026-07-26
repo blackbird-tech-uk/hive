@@ -33,6 +33,9 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       API_HOST: 0.0.0.0
       API_PORT: 8000
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-replace-this-with-a-long-development-secret-key-123456789}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-60}
     ports:
       - "8000:8000"
     volumes:

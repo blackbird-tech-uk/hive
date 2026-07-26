@@ -5,9 +5,10 @@ from sqlalchemy import engine_from_config, pool
 
 from hive.core.config import settings
 from hive.db.base import Base
-from hive.modules.enrollment.models import EnrollmentToken
 from hive.modules.assignments.models import Assignment
+from hive.modules.device_commands.models import DeviceCommand
 from hive.modules.devices.models import Device
+from hive.modules.enrollment.models import EnrollmentToken
 from hive.modules.events.models import Event
 from hive.modules.organizations.models import (
     Organization,
@@ -20,7 +21,6 @@ from hive.modules.rbac.models import (
     RolePermission,
 )
 from hive.modules.users.models import User
-
 config = context.config
 
 config.set_main_option("sqlalchemy.url", settings.database_url)
