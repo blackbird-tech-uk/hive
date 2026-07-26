@@ -1,7 +1,17 @@
-import { Radio } from 'lucide-react'
+import {
+  BatteryCharging,
+  BatteryLow,
+  BatteryMedium,
+  BatteryFull,
+  CircleOff,
+  Radio,
+  Wifi,
+} from 'lucide-react'
 
 import type { Device } from '../../lib/api'
 import { StatusBadge } from './StatusBadge'
+
+const ONLINE_THRESHOLD_MS = 20 * 60 * 1_000
 
 interface DeviceTableProps {
   devices: Device[]
@@ -15,9 +25,90 @@ function formatLabel(value: string): string {
     .join(' ')
 }
 
-export function 
-DeviceTable({ devices, 
-    onSelectDevice 
+function isDeviceOnline(device: Device): boolean {
+  if (!device.last_seen_at) {
+    return false
+  }
+
+  const lastSeenTime = new Date(device.last_seen_at).getTime()
+
+  if (Number.isNaN(lastSeenTime)) {
+    return false
+  }
+
+  return Date.now() - lastSeenTime <= ONLINE_THRESHOLD_MS
+}
+
+function formatLastSeen(value: string | null): string {
+  if (!value) {
+    return 'Never'
+  }
+
+  const timestamp = new Date(value).getTime()
+
+  if (Number.isNaN(timestamp)) {
+    return 'Unknown'
+  }
+
+  const differenceSeconds = Math.max(
+    0,
+    Math.floor((Date.now() - timestamp) / 1_000),
+  )
+
+  if (differenceSeconds < 10) {
+    return 'Just now'
+  }
+
+  if (differenceSeconds < 60) {
+    return `${differenceSeconds}s ago`
+  }
+
+  const differenceMinutes = Math.floor(differenceSeconds / 60)
+
+  if (differenceMinutes < 60) {
+    return `${differenceMinutes}m ago`
+  }
+
+  const differenceHours = Math.floor(differenceMinutes / 60)
+
+  if (differenceHours < 24) {
+    return `${differenceHours}h ago`
+  }
+
+  const differenceDays = Math.floor(differenceHours / 24)
+
+  return `${differenceDays}d ago`
+}
+
+function BatteryIcon({
+  level,
+  isCharging,
+}: {
+  level: number | null
+  isCharging: boolean | null
+}) {
+  if (isCharging) {
+    return <BatteryCharging size={17} aria-hidden="true" />
+  }
+
+  if (level === null) {
+    return <BatteryMedium size={17} aria-hidden="true" />
+  }
+
+  if (level <= 20) {
+    return <BatteryLow size={17} aria-hidden="true" />
+  }
+
+  if (level >= 80) {
+    return <BatteryFull size={17} aria-hidden="true" />
+  }
+
+  return <BatteryMedium size={17} aria-hidden="true" />
+}
+
+export function DeviceTable({
+  devices,
+  onSelectDevice,
 }: DeviceTableProps) {
   return (
     <div className="device-table-wrapper">
@@ -25,50 +116,137 @@ DeviceTable({ devices,
         <thead>
           <tr>
             <th>Device</th>
-            <th>Asset</th>
-            <th>Model</th>
+            <th>Connection</th>
+            <th>Battery</th>
+            <th>Network</th>
+            <th>IP address</th>
+            <th>Last seen</th>
             <th>Status</th>
-            <th>Condition</th>
-            <th>Android</th>
           </tr>
         </thead>
 
         <tbody>
-          {devices.map((device) => (
-            <tr
-  className="device-table-row"
-  key={device.id}
-  onClick={() => onSelectDevice(device)}
->
-              <td>
-                <div className="device-identity">
-                  <div className="device-icon">
-                    <Radio size={17} aria-hidden="true" />
+          {devices.map((device) => {
+            const online = isDeviceOnline(device)
+
+            return (
+              <tr
+                className="device-table-row"
+                key={device.id}
+                onClick={() => onSelectDevice(device)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === 'Enter' ||
+                    event.key === ' '
+                  ) {
+                    event.preventDefault()
+                    onSelectDevice(device)
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <td>
+                  <div className="device-identity">
+                    <div className="device-icon">
+                      <Radio size={17} aria-hidden="true" />
+                    </div>
+
+                    <div>
+                      <strong>{device.hive_id}</strong>
+
+                      <span>
+                        {device.asset_id ||
+                          device.serial_number ||
+                          'No asset recorded'}
+                      </span>
+
+                      <small>
+                        {device.model ?? 'Unknown model'}
+                      </small>
+                    </div>
                   </div>
+                </td>
 
-                  <div>
-                    <strong>{device.hive_id}</strong>
-                    <span>{device.serial_number}</span>
+                <td>
+                  <span
+                    className={`connection-status ${
+                      online
+                        ? 'connection-status-online'
+                        : 'connection-status-offline'
+                    }`}
+                  >
+                    {online ? (
+                      <Radio size={15} aria-hidden="true" />
+                    ) : (
+                      <CircleOff size={15} aria-hidden="true" />
+                    )}
+
+                    {online ? 'Online' : 'Offline'}
+                  </span>
+                </td>
+
+                <td>
+                  <div className="device-battery">
+                    <BatteryIcon
+                      level={device.battery_level}
+                      isCharging={device.is_charging}
+                    />
+
+                    <span>
+                      {device.battery_level !== null
+                        ? `${device.battery_level}%`
+                        : 'Unknown'}
+                    </span>
+
+                    {device.is_charging && (
+                      <small>Charging</small>
+                    )}
                   </div>
-                </div>
-              </td>
+                </td>
 
-              <td>{device.asset_id}</td>
-              <td>{device.model}</td>
+                <td>
+                  <div className="device-network">
+                    <Wifi size={16} aria-hidden="true" />
 
-              <td>
-                <StatusBadge status={device.status} />
-              </td>
+                    <span>
+                      {device.wifi_ssid ?? 'Unknown network'}
+                    </span>
+                  </div>
+                </td>
 
-              <td>
-                <span className="badge subtle-badge">
-                  {formatLabel(device.condition)}
-                </span>
-              </td>
+                <td>
+                  <code>
+                    {device.ip_address ?? 'Not reported'}
+                  </code>
+                </td>
 
-              <td>{device.android_version ?? 'Unknown'}</td>
-            </tr>
-          ))}
+                <td>
+                  <div className="device-last-seen">
+                    <strong>
+                      {formatLastSeen(device.last_seen_at)}
+                    </strong>
+
+                    <span>
+                      {device.last_seen_at
+                        ? new Date(
+                            device.last_seen_at,
+                          ).toLocaleString('en-GB')
+                        : 'No heartbeat received'}
+                    </span>
+                  </div>
+                </td>
+
+                <td>
+                  <StatusBadge status={device.status} />
+
+                  <span className="badge subtle-badge">
+                    {formatLabel(device.condition)}
+                  </span>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

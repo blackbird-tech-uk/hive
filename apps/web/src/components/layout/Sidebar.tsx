@@ -5,16 +5,17 @@ import {
   Radio,
   Settings,
   Wrench,
-} from 'lucide-react'
+} from "lucide-react";
+import { NavLink } from "react-router-dom";
 
 const navigationItems = [
-  { label: 'Dashboard', icon: LayoutDashboard },
-  { label: 'Devices', icon: Radio, active: true },
-  { label: 'Events', icon: CalendarDays },
-  { label: 'Inventory', icon: Box },
-  { label: 'Repairs', icon: Wrench },
-  { label: 'Settings', icon: Settings },
-]
+  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { label: "Devices", icon: Radio, path: "/devices" },
+  { label: "Events", icon: CalendarDays, path: "/events" },
+  { label: "Inventory", icon: Box, path: "/inventory" },
+  { label: "Repairs", icon: Wrench, path: "/repairs" },
+  { label: "Settings", icon: Settings, path: "/settings" },
+];
 
 export function Sidebar() {
   return (
@@ -31,15 +32,17 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar-nav" aria-label="Main navigation">
-        {navigationItems.map(({ label, icon: Icon, active }) => (
-          <button
-            className={`nav-item${active ? ' nav-item-active' : ''}`}
-            key={label}
-            type="button"
+        {navigationItems.map(({ label, icon: Icon, path }) => (
+          <NavLink
+            className={({ isActive }) =>
+              `nav-item${isActive ? " nav-item-active" : ""}`
+            }
+            key={path}
+            to={path}
           >
             <Icon size={18} aria-hidden="true" />
             <span>{label}</span>
-          </button>
+          </NavLink>
         ))}
       </nav>
 
@@ -52,5 +55,5 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
-  )
+  );
 }
