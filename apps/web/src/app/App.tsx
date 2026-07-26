@@ -1,8 +1,17 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import {
+  Navigate,
+  Route,
+  Routes,
+} from 'react-router-dom'
 
+import {
+  AuthProvider,
+  useAuth,
+} from './AuthContext'
 import { AppShell } from '../components/layout/AppShell'
 import { DashboardPage } from '../pages/Dashboard'
 import { DevicesPage } from '../pages/Devices'
+import { LoginPage } from '../pages/Login'
 
 function PlaceholderPage({
   eyebrow,
@@ -22,13 +31,48 @@ function PlaceholderPage({
   )
 }
 
-export function App() {
+function LoadingScreen() {
+  return (
+    <main className="auth-loading">
+      <div className="auth-loading-logo">
+        H
+      </div>
+
+      <p>Loading Hive…</p>
+    </main>
+  )
+}
+
+function ProtectedApplication() {
+  const {
+    isAuthenticated,
+    isLoading,
+  } = useAuth()
+
+  if (isLoading) {
+    return <LoadingScreen />
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Navigate
+        replace
+        to="/login"
+      />
+    )
+  }
+
   return (
     <AppShell>
       <Routes>
         <Route
           path="/"
-          element={<Navigate replace to="/dashboard" />}
+          element={
+            <Navigate
+              replace
+              to="/dashboard"
+            />
+          }
         />
 
         <Route
@@ -87,9 +131,56 @@ export function App() {
 
         <Route
           path="*"
-          element={<Navigate replace to="/dashboard" />}
+          element={
+            <Navigate
+              replace
+              to="/dashboard"
+            />
+          }
         />
       </Routes>
     </AppShell>
+  )
+}
+
+function ApplicationRoutes() {
+  const {
+    isAuthenticated,
+    isLoading,
+  } = useAuth()
+
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          isLoading ? (
+            <LoadingScreen />
+          ) : isAuthenticated ? (
+            <Navigate
+              replace
+              to="/dashboard"
+            />
+          ) : (
+            <LoginPage />
+          )
+        }
+      />
+
+      <Route
+        path="/*"
+        element={
+          <ProtectedApplication />
+        }
+      />
+    </Routes>
+  )
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <ApplicationRoutes />
+    </AuthProvider>
   )
 }
