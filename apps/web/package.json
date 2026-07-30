@@ -17,6 +17,7 @@
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "react-qr-code": "^2.2.0",
     "react-router-dom": "^7.18.1",
     "tailwind-merge": "latest"
   },

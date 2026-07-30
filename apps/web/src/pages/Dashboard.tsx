@@ -1,146 +1,313 @@
 import {
-  CalendarPlus,
-  ClipboardPlus,
+  Activity,
+  Battery,
+  CheckCircle2,
+  Clock3,
+  Lock,
+  MessageSquare,
+  Radio,
+  RefreshCw,
   Smartphone,
-  Wrench,
+  Wifi,
+  XCircle,
+  Zap,
 } from 'lucide-react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { Link } from 'react-router-dom'
-
-import { useEffect, useMemo, useState } from 'react'
 
 import { StatCard } from '../components/dashboard/StatCard'
 import { TopBar } from '../components/layout/TopBar'
 import {
+  createDeviceCommand,
+  getDeviceCommands,
   getDevices,
-  getEvents,
   type Device,
-  type Event,
+  type DeviceCommand,
 } from '../lib/api'
 
 type DashboardError = {
   devices?: string
-  events?: string
+  commands?: string
 }
 
-function formatDate(date: string): string {
+type CommandName =
+  | 'SYNC'
+  | 'PING'
+  | 'LOCK_DEVICE'
+  | 'SHOW_MESSAGE'
+
+const ONLINE_WINDOW_MS = 2 * 60 * 1000
+
+function isDeviceOnline(device: Device): boolean {
+  if (!device.last_seen_at) {
+    return false
+  }
+
+  const lastSeen = new Date(device.last_seen_at).getTime()
+
+  return Date.now() - lastSeen <= ONLINE_WINDOW_MS
+}
+
+function formatRelativeTime(value: string | null): string {
+  if (!value) {
+    return 'Never'
+  }
+
+  const timestamp = new Date(value).getTime()
+  const difference = Date.now() - timestamp
+  const seconds = Math.max(0, Math.floor(difference / 1000))
+
+  if (seconds < 10) {
+    return 'Just now'
+  }
+
+  if (seconds < 60) {
+    return `${seconds} seconds ago`
+  }
+
+  const minutes = Math.floor(seconds / 60)
+
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`
+  }
+
+  const hours = Math.floor(minutes / 60)
+
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  }
+
   return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
     month: 'short',
-    year: 'numeric',
-  }).format(new Date(date))
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
 }
 
-function getEventProgress(event: Event): string {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+function formatCommandName(command: string): string {
+  return command
+    .toLowerCase()
+    .split('_')
+    .map(
+      (part) =>
+        part.charAt(0).toUpperCase() + part.slice(1),
+    )
+    .join(' ')
+}
 
-  const startDate = new Date(event.start_date)
-  const endDate = new Date(event.end_date)
-
-  startDate.setHours(0, 0, 0, 0)
-  endDate.setHours(0, 0, 0, 0)
-
-  if (today < startDate) {
-    return 'Upcoming'
-  }
-
-  if (today > endDate) {
-    return 'Finished'
-  }
-
-  return 'In progress'
+function getCommandStatusClass(status: string): string {
+  return `command-status command-status-${status.toLowerCase()}`
 }
 
 export function DashboardPage() {
   const [devices, setDevices] = useState<Device[]>([])
-  const [events, setEvents] = useState<Event[]>([])
+  const [commands, setCommands] = useState<DeviceCommand[]>([])
+  const [selectedDeviceId, setSelectedDeviceId] =
+    useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [sendingCommand, setSendingCommand] =
+    useState<CommandName | null>(null)
   const [errors, setErrors] = useState<DashboardError>({})
+  const [notice, setNotice] = useState<string | null>(null)
 
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     setLoading(true)
     setErrors({})
 
-    const [deviceResult, eventResult] = await Promise.allSettled([
-      getDevices(),
-      getEvents(),
-    ])
+    try {
+      const loadedDevices = await getDevices()
+      setDevices(loadedDevices)
 
-    const nextErrors: DashboardError = {}
+      const nextSelectedDevice =
+        selectedDeviceId || loadedDevices[0]?.id || ''
 
-    if (deviceResult.status === 'fulfilled') {
-      setDevices(deviceResult.value)
-    } else {
-      nextErrors.devices =
-        deviceResult.reason instanceof Error
-          ? deviceResult.reason.message
-          : 'Unable to load devices.'
+      setSelectedDeviceId(nextSelectedDevice)
+
+      if (!nextSelectedDevice) {
+        setCommands([])
+        return
+      }
+
+      try {
+        const loadedCommands =
+          await getDeviceCommands(nextSelectedDevice)
+
+        setCommands(loadedCommands)
+      } catch (error) {
+        setErrors((current) => ({
+          ...current,
+          commands:
+            error instanceof Error
+              ? error.message
+              : 'Unable to load commands.',
+        }))
+      }
+    } catch (error) {
+      setErrors({
+        devices:
+          error instanceof Error
+            ? error.message
+            : 'Unable to load devices.',
+      })
+    } finally {
+      setLoading(false)
     }
-
-    if (eventResult.status === 'fulfilled') {
-      setEvents(eventResult.value)
-    } else {
-      nextErrors.events =
-        eventResult.reason instanceof Error
-          ? eventResult.reason.message
-          : 'Unable to load events.'
-    }
-
-    setErrors(nextErrors)
-    setLoading(false)
-  }
+  }, [selectedDeviceId])
 
   useEffect(() => {
     void loadDashboard()
-  }, [])
+  }, [loadDashboard])
+
+  useEffect(() => {
+    if (!selectedDeviceId) {
+      return
+    }
+
+    const interval = window.setInterval(() => {
+      void getDeviceCommands(selectedDeviceId)
+        .then(setCommands)
+        .catch(() => undefined)
+    }, 5000)
+
+    return () => window.clearInterval(interval)
+  }, [selectedDeviceId])
+
+  const selectedDevice = useMemo(
+    () =>
+      devices.find(
+        (device) => device.id === selectedDeviceId,
+      ) ?? null,
+    [devices, selectedDeviceId],
+  )
 
   const deviceStats = useMemo(() => {
-    const available = devices.filter(
-      (device) => device.status === 'available',
-    ).length
+    const online = devices.filter(isDeviceOnline).length
 
-    const assigned = devices.filter((device) =>
-      ['assigned', 'in_use'].includes(device.status),
-    ).length
-
-    const repair = devices.filter((device) =>
-      ['repair', 'maintenance'].includes(device.status),
-    ).length
-
-    const unavailable = devices.filter((device) =>
-      ['offline', 'lost', 'retired'].includes(device.status),
+    const lowBattery = devices.filter(
+      (device) =>
+        device.battery_level !== null &&
+        device.battery_level <= 20,
     ).length
 
     return {
       total: devices.length,
-      available,
-      assigned,
-      repair,
-      unavailable,
+      online,
+      offline: Math.max(0, devices.length - online),
+      lowBattery,
     }
   }, [devices])
 
-  const operationalEvents = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+  const commandStats = useMemo(() => {
+    const completed = commands.filter(
+      (command) => command.status === 'completed',
+    ).length
 
-    return [...events]
-      .filter((event) => {
-        const endDate = new Date(event.end_date)
-        endDate.setHours(23, 59, 59, 999)
+    const active = commands.filter((command) =>
+      ['pending', 'sent', 'acknowledged'].includes(
+        command.status,
+      ),
+    ).length
 
-        return (
-          endDate >= today &&
-          !['cancelled', 'archived'].includes(event.status)
+    const failed = commands.filter(
+      (command) => command.status === 'failed',
+    ).length
+
+    return {
+      completed,
+      active,
+      failed,
+    }
+  }, [commands])
+
+  const latestCommands = useMemo(
+    () =>
+      [...commands]
+        .sort(
+          (first, second) =>
+            new Date(second.created_at).getTime() -
+            new Date(first.created_at).getTime(),
         )
-      })
-      .sort(
-        (firstEvent, secondEvent) =>
-          new Date(firstEvent.start_date).getTime() -
-          new Date(secondEvent.start_date).getTime(),
+        .slice(0, 8),
+    [commands],
+  )
+
+  async function selectDevice(deviceId: string) {
+    setSelectedDeviceId(deviceId)
+    setErrors((current) => ({
+      ...current,
+      commands: undefined,
+    }))
+
+    try {
+      setCommands(await getDeviceCommands(deviceId))
+    } catch (error) {
+      setCommands([])
+      setErrors((current) => ({
+        ...current,
+        commands:
+          error instanceof Error
+            ? error.message
+            : 'Unable to load commands.',
+      }))
+    }
+  }
+
+  async function sendCommand(command: CommandName) {
+    if (!selectedDevice) {
+      setNotice('Select a device before sending a command.')
+      return
+    }
+
+    setSendingCommand(command)
+    setNotice(null)
+
+    try {
+      const payload =
+        command === 'SHOW_MESSAGE'
+          ? {
+              title: 'Hive message',
+              message:
+                'This device is being managed by Hive.',
+            }
+          : {}
+
+      const createdCommand = await createDeviceCommand(
+        selectedDevice.id,
+        {
+          command,
+          payload,
+        },
       )
-      .slice(0, 5)
-  }, [events])
+
+      setCommands((current) => [
+        createdCommand,
+        ...current.filter(
+          (item) => item.id !== createdCommand.id,
+        ),
+      ])
+
+      setNotice(
+        `${formatCommandName(command)} queued for ${
+          selectedDevice.asset_id ||
+          selectedDevice.hive_id
+        }.`,
+      )
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : 'Unable to send command.',
+      )
+    } finally {
+      setSendingCommand(null)
+    }
+  }
 
   return (
     <>
@@ -149,73 +316,21 @@ export function DashboardPage() {
         onRefresh={() => void loadDashboard()}
       />
 
-      <section className="dashboard-heading">
+      <section className="dashboard-heading control-centre-heading">
         <div>
-          <p className="eyebrow">OPERATIONS OVERVIEW</p>
-          <h1>Dashboard</h1>
+          <p className="eyebrow">BLACKBIRD DEVICE MANAGEMENT</p>
+          <h1>Hive Control Centre</h1>
           <p>
-            Monitor scanner availability, assignments and upcoming events.
+            Monitor enrolled Android devices, live telemetry
+            and remote command delivery.
           </p>
         </div>
+
+        <div className="platform-status">
+          <span className="platform-status-dot" />
+          <span>Platform operational</span>
+        </div>
       </section>
-
-      <section className="dashboard-quick-actions">
-  <Link
-    className="dashboard-quick-action"
-    to="/devices"
-  >
-    <span className="dashboard-quick-action-icon">
-      <Smartphone size={20} aria-hidden="true" />
-    </span>
-
-    <span>
-      <strong>Manage Scanners</strong>
-      <small>View, search and edit devices</small>
-    </span>
-  </Link>
-
-  <Link
-    className="dashboard-quick-action"
-    to="/events"
-  >
-    <span className="dashboard-quick-action-icon">
-      <CalendarPlus size={20} aria-hidden="true" />
-    </span>
-
-    <span>
-      <strong>Create Event</strong>
-      <small>Prepare a new show or event</small>
-    </span>
-  </Link>
-
-  <Link
-    className="dashboard-quick-action"
-    to="/assignments"
-  >
-    <span className="dashboard-quick-action-icon">
-      <ClipboardPlus size={20} aria-hidden="true" />
-    </span>
-
-    <span>
-      <strong>Assign Scanner</strong>
-      <small>Allocate kit to an event</small>
-    </span>
-  </Link>
-
-  <Link
-    className="dashboard-quick-action"
-    to="/devices"
-  >
-    <span className="dashboard-quick-action-icon">
-      <Wrench size={20} aria-hidden="true" />
-    </span>
-
-    <span>
-      <strong>Repair Queue</strong>
-      <small>Review devices needing attention</small>
-    </span>
-  </Link>
-</section>
 
       {errors.devices && (
         <div className="dashboard-alert" role="alert">
@@ -224,157 +339,372 @@ export function DashboardPage() {
         </div>
       )}
 
-      <section className="metric-grid">
+      {notice && (
+        <div className="dashboard-notice" role="status">
+          <Activity size={18} aria-hidden="true" />
+          <span>{notice}</span>
+        </div>
+      )}
+
+      <section className="metric-grid control-centre-metrics">
         <StatCard
-          label="Total Devices"
+          label="Managed Devices"
           value={deviceStats.total}
-          description="Registered in Hive"
+          description="Enrolled in Hive"
         />
 
         <StatCard
-          label="Available"
-          value={deviceStats.available}
-          description="Ready to assign"
+          label="Online Now"
+          value={deviceStats.online}
+          description={`${deviceStats.offline} currently offline`}
         />
 
         <StatCard
-          label="Assigned"
-          value={deviceStats.assigned}
-          description="Currently allocated"
+          label="Active Commands"
+          value={commandStats.active}
+          description={`${commandStats.completed} completed`}
         />
 
         <StatCard
-          label="Repair"
-          value={deviceStats.repair}
-          description="Needs attention"
+          label="Low Battery"
+          value={deviceStats.lowBattery}
+          description="Devices at 20% or below"
         />
       </section>
 
-      <section className="dashboard-grid">
-        <article className="dashboard-panel">
-          <header className="dashboard-panel-header">
-            <div>
-              <p className="eyebrow">EVENT OPERATIONS</p>
-              <h2>Active and upcoming events</h2>
-            </div>
+      <section className="control-centre-grid">
+        <div className="control-centre-main">
+          <article className="dashboard-panel">
+            <header className="dashboard-panel-header">
+              <div>
+                <p className="eyebrow">LIVE FLEET</p>
+                <h2>Connected devices</h2>
+              </div>
 
-            <span className="dashboard-count">
-              {operationalEvents.length}
-            </span>
-          </header>
+              <Link className="panel-link" to="/devices">
+                View all devices
+              </Link>
+            </header>
 
-          {errors.events ? (
-            <div className="dashboard-empty-state">
-              <h3>Event data is not connected yet</h3>
-              <p>
-                The dashboard is ready, but the event backend route still
-                needs to be implemented.
-              </p>
-            </div>
-          ) : operationalEvents.length === 0 ? (
-            <div className="dashboard-empty-state">
-              <h3>No upcoming events</h3>
-              <p>Create an event to begin assigning scanners.</p>
-            </div>
-          ) : (
-            <div className="dashboard-event-list">
-              {operationalEvents.map((event) => (
-                <article
-                  className="dashboard-event-card"
-                  key={event.id}
-                >
-                  <div className="dashboard-event-main">
-                    <div>
-                      <h3>{event.name}</h3>
-                      <p>{event.venue}</p>
-                    </div>
+            {devices.length === 0 && !loading ? (
+              <div className="dashboard-empty-state">
+                <Smartphone size={32} aria-hidden="true" />
+                <h3>No enrolled devices</h3>
+                <p>
+                  Enrol an Android device to begin receiving
+                  telemetry.
+                </p>
+              </div>
+            ) : (
+              <div className="live-device-list">
+                {devices.slice(0, 8).map((device) => {
+                  const online = isDeviceOnline(device)
+                  const selected =
+                    selectedDeviceId === device.id
 
-                    <span className="badge subtle-badge">
-                      {getEventProgress(event)}
-                    </span>
-                  </div>
-
-                  <div className="dashboard-event-dates">
-                    <span>
-                      {formatDate(event.start_date)}
-                    </span>
-
-                    <span aria-hidden="true">→</span>
-
-                    <span>
-                      {formatDate(event.end_date)}
-                    </span>
-                  </div>
-
-                  <div className="dashboard-allocation">
-                    <div>
-                      <span>Scanner allocation</span>
-                      <strong>Assignment data pending</strong>
-                    </div>
-
-                    <div
-                      aria-label="Scanner allocation not yet available"
-                      className="dashboard-progress-track"
+                  return (
+                    <button
+                      className={`live-device-row${
+                        selected
+                          ? ' live-device-row-selected'
+                          : ''
+                      }`}
+                      key={device.id}
+                      onClick={() =>
+                        void selectDevice(device.id)
+                      }
+                      type="button"
                     >
+                      <span className="live-device-icon">
+                        <Smartphone
+                          size={19}
+                          aria-hidden="true"
+                        />
+                      </span>
+
+                      <span className="live-device-identity">
+                        <strong>
+                          {device.asset_id || device.hive_id}
+                        </strong>
+                        <small>
+                          {[device.manufacturer, device.model]
+                            .filter(Boolean)
+                            .join(' ') || 'Android device'}
+                        </small>
+                      </span>
+
                       <span
-                        className="dashboard-progress-value"
-                        style={{ width: '0%' }}
-                      />
-                    </div>
-                  </div>
-                </article>
+                        className={`connection-status ${
+                          online
+                            ? 'connection-status-online'
+                            : 'connection-status-offline'
+                        }`}
+                      >
+                        <span className="device-state-dot" />
+                        {online ? 'Online' : 'Offline'}
+                      </span>
+
+                      <span className="live-device-detail">
+                        <Battery size={16} aria-hidden="true" />
+                        {device.battery_level === null
+                          ? '—'
+                          : `${device.battery_level}%`}
+                      </span>
+
+                      <span className="live-device-detail">
+                        <Wifi size={16} aria-hidden="true" />
+                        {device.wifi_ssid || 'No Wi-Fi'}
+                      </span>
+
+                      <span className="live-device-last-seen">
+                        {formatRelativeTime(
+                          device.last_seen_at,
+                        )}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </article>
+
+          <article className="dashboard-panel">
+            <header className="dashboard-panel-header">
+              <div>
+                <p className="eyebrow">COMMAND LIFECYCLE</p>
+                <h2>Recent commands</h2>
+              </div>
+
+              <span className="dashboard-count">
+                {commands.length}
+              </span>
+            </header>
+
+            {errors.commands ? (
+              <div className="dashboard-alert" role="alert">
+                <strong>Command data unavailable.</strong>
+                <span>{errors.commands}</span>
+              </div>
+            ) : latestCommands.length === 0 ? (
+              <div className="dashboard-empty-state">
+                <Zap size={32} aria-hidden="true" />
+                <h3>No commands sent yet</h3>
+                <p>
+                  Select a device and send a remote action
+                  from the command panel.
+                </p>
+              </div>
+            ) : (
+              <div className="command-table-wrapper">
+                <table className="command-table">
+                  <thead>
+                    <tr>
+                      <th>Command</th>
+                      <th>Status</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {latestCommands.map((command) => (
+                      <tr key={command.id}>
+                        <td>
+                          <strong>
+                            {formatCommandName(
+                              command.command,
+                            )}
+                          </strong>
+                        </td>
+
+                        <td>
+                          <span
+                            className={getCommandStatusClass(
+                              command.status,
+                            )}
+                          >
+                            {command.status}
+                          </span>
+                        </td>
+
+                        <td>
+                          {formatRelativeTime(
+                            command.created_at,
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </article>
+        </div>
+
+        <aside className="control-centre-side">
+          <article className="dashboard-panel remote-actions-panel">
+            <header className="dashboard-panel-header">
+              <div>
+                <p className="eyebrow">REMOTE MANAGEMENT</p>
+                <h2>Device actions</h2>
+              </div>
+            </header>
+
+            <label
+              className="device-selector-label"
+              htmlFor="dashboard-device"
+            >
+              Target device
+            </label>
+
+            <select
+              className="device-selector"
+              id="dashboard-device"
+              value={selectedDeviceId}
+              onChange={(event) =>
+                void selectDevice(event.target.value)
+              }
+            >
+              <option value="">Select a device</option>
+
+              {devices.map((device) => (
+                <option key={device.id} value={device.id}>
+                  {device.asset_id || device.hive_id}
+                </option>
               ))}
-            </div>
-          )}
-        </article>
+            </select>
 
-        <article className="dashboard-panel">
-          <header className="dashboard-panel-header">
-            <div>
-              <p className="eyebrow">DEVICE HEALTH</p>
-              <h2>Fleet summary</h2>
-            </div>
-          </header>
+            {selectedDevice && (
+              <div className="selected-device-summary">
+                <div>
+                  <span>Device</span>
+                  <strong>
+                    {selectedDevice.asset_id ||
+                      selectedDevice.hive_id}
+                  </strong>
+                </div>
 
-          <div className="dashboard-status-list">
-            <div className="dashboard-status-row">
-              <span>Available</span>
-              <strong>{deviceStats.available}</strong>
-            </div>
+                <div>
+                  <span>Last seen</span>
+                  <strong>
+                    {formatRelativeTime(
+                      selectedDevice.last_seen_at,
+                    )}
+                  </strong>
+                </div>
 
-            <div className="dashboard-status-row">
-              <span>Assigned or in use</span>
-              <strong>{deviceStats.assigned}</strong>
-            </div>
+                <div>
+                  <span>Agent</span>
+                  <strong>
+                    {selectedDevice.agent_version ||
+                      'Unknown'}
+                  </strong>
+                </div>
+              </div>
+            )}
 
-            <div className="dashboard-status-row">
-              <span>Repair or maintenance</span>
-              <strong>{deviceStats.repair}</strong>
-            </div>
+            <div className="remote-action-grid">
+              <button
+                className="remote-action remote-action-primary"
+                disabled={!selectedDevice || !!sendingCommand}
+                onClick={() => void sendCommand('SYNC')}
+                type="button"
+              >
+                <RefreshCw size={18} aria-hidden="true" />
+                <span>
+                  <strong>Sync</strong>
+                  <small>Request immediate check-in</small>
+                </span>
+              </button>
 
-            <div className="dashboard-status-row">
-              <span>Offline, lost or retired</span>
-              <strong>{deviceStats.unavailable}</strong>
-            </div>
-          </div>
-        </article>
+              <button
+                className="remote-action"
+                disabled={!selectedDevice || !!sendingCommand}
+                onClick={() => void sendCommand('PING')}
+                type="button"
+              >
+                <Radio size={18} aria-hidden="true" />
+                <span>
+                  <strong>Ping</strong>
+                  <small>Test agent communication</small>
+                </span>
+              </button>
 
-        <article className="dashboard-panel dashboard-activity-panel">
-          <header className="dashboard-panel-header">
-            <div>
-              <p className="eyebrow">RECENT ACTIVITY</p>
-              <h2>Assignment activity</h2>
-            </div>
-          </header>
+              <button
+                className="remote-action"
+                disabled={!selectedDevice || !!sendingCommand}
+                onClick={() =>
+                  void sendCommand('SHOW_MESSAGE')
+                }
+                type="button"
+              >
+                <MessageSquare
+                  size={18}
+                  aria-hidden="true"
+                />
+                <span>
+                  <strong>Send message</strong>
+                  <small>Display an agent notification</small>
+                </span>
+              </button>
 
-          <div className="dashboard-empty-state">
-            <h3>No activity recorded yet</h3>
-            <p>
-              Assignment and return actions will appear here once the
-              assignment API is connected.
-            </p>
-          </div>
-        </article>
+              <button
+                className="remote-action remote-action-danger"
+                disabled={!selectedDevice || !!sendingCommand}
+                onClick={() =>
+                  void sendCommand('LOCK_DEVICE')
+                }
+                type="button"
+              >
+                <Lock size={18} aria-hidden="true" />
+                <span>
+                  <strong>Lock device</strong>
+                  <small>Queue a secure lock command</small>
+                </span>
+              </button>
+            </div>
+          </article>
+
+          <article className="dashboard-panel">
+            <header className="dashboard-panel-header">
+              <div>
+                <p className="eyebrow">COMMAND HEALTH</p>
+                <h2>Delivery summary</h2>
+              </div>
+            </header>
+
+            <div className="command-summary-list">
+              <div>
+                <CheckCircle2
+                  className="summary-success"
+                  size={19}
+                  aria-hidden="true"
+                />
+                <span>Completed</span>
+                <strong>{commandStats.completed}</strong>
+              </div>
+
+              <div>
+                <Clock3
+                  className="summary-active"
+                  size={19}
+                  aria-hidden="true"
+                />
+                <span>In progress</span>
+                <strong>{commandStats.active}</strong>
+              </div>
+
+              <div>
+                <XCircle
+                  className="summary-failed"
+                  size={19}
+                  aria-hidden="true"
+                />
+                <span>Failed</span>
+                <strong>{commandStats.failed}</strong>
+              </div>
+            </div>
+          </article>
+        </aside>
       </section>
     </>
   )
