@@ -25,6 +25,32 @@ data class DeviceHeartbeatResponse(
     val commands: List<DeviceCommand>,
 )
 
+data class DeviceLocationUpload(
+    val latitude: Double,
+    val longitude: Double,
+    val accuracy: Float?,
+    val altitude: Double?,
+    val speed: Float?,
+    val bearing: Float?,
+    val provider: String?,
+    val recordedAt: String,
+)
+
+data class DeviceLocationResponse(
+    val id: String,
+    val organizationId: String,
+    val deviceId: String,
+    val latitude: Double,
+    val longitude: Double,
+    val accuracy: Float?,
+    val altitude: Double?,
+    val speed: Float?,
+    val bearing: Float?,
+    val provider: String?,
+    val recordedAt: String,
+    val createdAt: String,
+)
+
 data class CommandExecutionResult(
     val successful: Boolean,
     val message: String,

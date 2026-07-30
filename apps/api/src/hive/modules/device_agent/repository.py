@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from hive.modules.device_locations.models import DeviceLocation
 from hive.modules.devices.models import Device
 
 
@@ -34,3 +35,14 @@ class DeviceAgentRepository:
         device.last_seen_at = now
         self.db.flush()
         return device
+
+    def add_location(
+        self,
+        location: DeviceLocation,
+    ) -> DeviceLocation:
+        """Save a new location report."""
+
+        self.db.add(location)
+        self.db.flush()
+        self.db.refresh(location)
+        return location

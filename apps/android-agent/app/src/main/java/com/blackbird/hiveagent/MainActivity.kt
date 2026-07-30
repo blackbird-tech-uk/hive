@@ -2,11 +2,13 @@ package com.blackbird.hiveagent
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,14 +49,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.blackbird.hiveagent.ui.theme.HiveAgentTheme
 
 class MainActivity : ComponentActivity() {
 
+    private val locationPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { permissions ->
+            val fineLocationGranted =
+                permissions[
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ] == true
+
+            val coarseLocationGranted =
+                permissions[
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ] == true
+
+            if (fineLocationGranted || coarseLocationGranted) {
+                requestBackgroundLocationPermission()
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        requestForegroundLocationPermission()
 
         setContent {
             HiveAgentTheme {
@@ -67,6 +89,36 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun requestForegroundLocationPermission() {
+        val fineLocationGranted =
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED
+
+        val coarseLocationGranted =
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (fineLocationGranted || coarseLocationGranted) {
+            requestBackgroundLocationPermission()
+            return
+        }
+
+        locationPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ),
+        )
+    }
+
+    private fun requestBackgroundLocationPermission() {
+        // Background location is requested separately in the next step.
+    }
 }
 
 @Composable
@@ -74,29 +126,7 @@ fun HiveAgentScreen(
     hiveViewModel: HiveViewModel = viewModel(),
 ) {
     val uiState by hiveViewModel.uiState.collectAsState()
-    val context = LocalContext.current
-
-    val locationPermissionLauncher =
-        rememberLauncherForActivityResult(
-            contract =
-                ActivityResultContracts.RequestPermission(),
-        ) {
-            // Telemetry can continue without location permission.
-        }
-
     LaunchedEffect(Unit) {
-        val permissionGranted =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-            ) == PackageManager.PERMISSION_GRANTED
-
-        if (!permissionGranted) {
-            locationPermissionLauncher.launch(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-            )
-        }
-
         hiveViewModel.loadDevice()
     }
 
@@ -118,6 +148,7 @@ fun HiveAgentScreen(
         else -> {
             EnrolmentScreen(
                 error = uiState.error,
+                isEnrolling = uiState.isEnrolling,
                 onEnrol = hiveViewModel::enrolDevice,
             )
         }
@@ -142,7 +173,7 @@ private fun LoadingScreen() {
             CircularProgressIndicator()
 
             Text(
-                text = "Connecting to Hive…",
+                text = "Connecting to Hive...",
                 style =
                     MaterialTheme.typography.bodyLarge,
             )
@@ -153,6 +184,7 @@ private fun LoadingScreen() {
 @Composable
 private fun EnrolmentScreen(
     error: String?,
+    isEnrolling: Boolean,
     onEnrol: (
         enrollmentToken: String,
         assetId: String,
@@ -166,9 +198,39 @@ private fun EnrolmentScreen(
         mutableStateOf("")
     }
 
+    val context = LocalContext.current
+
+    val detectedSerial =
+        remember {
+            Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ANDROID_ID,
+            ) ?: "Unknown"
+        }
+
+    val detectedManufacturer =
+        remember {
+            Build.MANUFACTURER
+                .ifBlank { "Unknown" }
+        }
+
+    val detectedModel =
+        remember {
+            Build.MODEL
+                .ifBlank { "Unknown" }
+        }
+
+    val detectedAndroidVersion =
+        remember {
+            Build.VERSION.RELEASE
+                ?.ifBlank { "Unknown" }
+                ?: "Unknown"
+        }
+
     val canSubmit =
-        enrollmentToken.isNotBlank() &&
-            assetId.isNotBlank()
+        enrollmentToken.trim().length >= 10 &&
+            assetId.isNotBlank() &&
+            !isEnrolling
 
     Scaffold { innerPadding ->
         LazyColumn(
@@ -216,7 +278,8 @@ private fun EnrolmentScreen(
                 OutlinedTextField(
                     value = enrollmentToken,
                     onValueChange = {
-                        enrollmentToken = it
+                        enrollmentToken =
+                            it.uppercase()
                     },
                     label = {
                         Text("Enrolment token")
@@ -227,6 +290,7 @@ private fun EnrolmentScreen(
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !isEnrolling,
                     singleLine = true,
                     keyboardOptions =
                         KeyboardOptions(
@@ -243,7 +307,8 @@ private fun EnrolmentScreen(
                 OutlinedTextField(
                     value = assetId,
                     onValueChange = {
-                        assetId = it
+                        assetId =
+                            it.uppercase()
                     },
                     label = {
                         Text("Asset ID")
@@ -254,12 +319,50 @@ private fun EnrolmentScreen(
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !isEnrolling,
                     singleLine = true,
                     keyboardOptions =
                         KeyboardOptions(
                             capitalization =
                                 KeyboardCapitalization
                                     .Characters,
+                        ),
+                )
+
+                Spacer(
+                    modifier = Modifier.height(24.dp),
+                )
+
+                Text(
+                    text = "Detected device",
+                    style =
+                        MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                Spacer(
+                    modifier = Modifier.height(12.dp),
+                )
+
+                DetailsCard(
+                    rows =
+                        listOf(
+                            DetailRow(
+                                label = "Manufacturer",
+                                value = detectedManufacturer,
+                            ),
+                            DetailRow(
+                                label = "Model",
+                                value = detectedModel,
+                            ),
+                            DetailRow(
+                                label = "Android",
+                                value = detectedAndroidVersion,
+                            ),
+                            DetailRow(
+                                label = "Device identifier",
+                                value = detectedSerial,
+                            ),
                         ),
                 )
 
@@ -287,7 +390,22 @@ private fun EnrolmentScreen(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = canSubmit,
                 ) {
-                    Text("Enrol device")
+                    if (isEnrolling) {
+                        CircularProgressIndicator(
+                            modifier =
+                                Modifier.height(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+
+                        Spacer(
+                            modifier =
+                                Modifier.padding(horizontal = 6.dp),
+                        )
+
+                        Text("Enrolling...")
+                    } else {
+                        Text("Enrol device")
+                    }
                 }
 
                 Spacer(

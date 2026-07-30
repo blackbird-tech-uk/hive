@@ -21,7 +21,10 @@ class HeartbeatWorker(
     private val preferences = AgentPreferences(appContext)
     private val deviceInfoProvider = DeviceInfoProvider(appContext)
     private val apiClient = HiveApiClient()
-    private val commandProcessor = CommandProcessor(appContext)
+   private val commandProcessor = CommandProcessor(
+    context = appContext,
+    apiClient = apiClient,
+)
 
     override suspend fun doWork(): Result {
         Log.d(
@@ -112,7 +115,10 @@ class HeartbeatWorker(
                     )
 
                     val commandResult =
-                        commandProcessor.execute(command)
+    commandProcessor.execute(
+        command = command,
+        deviceToken = deviceToken,
+    )
 
                     if (commandResult.successful) {
                         apiClient.completeCommand(

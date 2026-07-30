@@ -19,6 +19,7 @@ import retrofit2.HttpException
 
 data class HiveUiState(
     val isLoading: Boolean = true,
+    val isEnrolling: Boolean = false,
     val isEnrolled: Boolean = false,
     val device: DeviceAgentResponse? = null,
     val error: String? = null,
@@ -107,10 +108,14 @@ class HiveViewModel(
         assetId: String,
     ) {
         val cleanEnrollmentToken =
-            enrollmentToken.trim()
+            enrollmentToken
+                .trim()
+                .uppercase()
 
         val cleanAssetId =
-            assetId.trim()
+            assetId
+                .trim()
+                .uppercase()
 
         if (cleanEnrollmentToken.isBlank()) {
             _uiState.value =
@@ -137,8 +142,10 @@ class HiveViewModel(
             )
 
             _uiState.value =
-                HiveUiState(
-                    isLoading = true,
+                _uiState.value.copy(
+                    isLoading = false,
+                    isEnrolling = true,
+                    error = null,
                 )
 
             try {
@@ -227,6 +234,7 @@ class HiveViewModel(
                 _uiState.value =
                     HiveUiState(
                         isLoading = false,
+                        isEnrolling = false,
                         isEnrolled = false,
                         error = readableError(error),
                     )
@@ -342,35 +350,91 @@ class HiveViewModel(
     private fun readableError(
         error: Exception,
     ): String {
-        return when (error) {
-            is HttpException -> {
-                when (error.code()) {
-                    400 ->
-                        "The enrolment request was rejected."
+        if (error is HttpException) {
+            val serverMessage =
+                extractServerMessage(error)
 
-                    401 ->
-                        "Hive rejected the device token."
-
-                    404 ->
-                        "The enrolment token or device was not found."
-
-                    409 ->
-                        "This device may already be enrolled."
-
-                    410 ->
-                        "The enrolment token has expired or was revoked."
-
-                    422 ->
-                        "Hive could not validate the device information."
-
-                    else ->
-                        "Hive returned HTTP ${error.code()}."
-                }
+            if (!serverMessage.isNullOrBlank()) {
+                return serverMessage
             }
 
-            else ->
-                error.message
-                    ?: "Unable to connect to Hive."
+            return when (error.code()) {
+                400 ->
+                    "The enrolment request was rejected."
+
+                401 ->
+                    "Hive rejected the device token."
+
+                404 ->
+                    "The enrolment token or device was not found."
+
+                409 ->
+                    "This device is already enrolled or its identifiers are already in use."
+
+                410 ->
+                    "The enrolment token has expired, has been revoked, or has no uses remaining."
+
+                422 ->
+                    "Hive could not validate the device information."
+
+                else ->
+                    "Hive returned HTTP ${error.code()}."
+            }
+        }
+
+        return error.message
+            ?: "Unable to connect to Hive. Check the network and try again."
+    }
+
+    private fun extractServerMessage(
+        error: HttpException,
+    ): String? {
+        return try {
+            val body =
+                error.response()
+                    ?.errorBody()
+                    ?.string()
+                    ?.trim()
+                    .orEmpty()
+
+            if (body.isBlank()) {
+                return null
+            }
+
+            val json =
+                org.json.JSONObject(body)
+
+            when (val detail = json.opt("detail")) {
+                is String ->
+                    detail.takeIf { it.isNotBlank() }
+
+                is org.json.JSONArray -> {
+                    val messages =
+                        buildList {
+                            for (index in 0 until detail.length()) {
+                                val item =
+                                    detail.optJSONObject(index)
+
+                                val message =
+                                    item?.optString("msg")
+                                        ?.trim()
+
+                                if (!message.isNullOrBlank()) {
+                                    add(message)
+                                }
+                            }
+                        }
+
+                    messages
+                        .distinct()
+                        .joinToString("\n")
+                        .takeIf { it.isNotBlank() }
+                }
+
+                else -> null
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 

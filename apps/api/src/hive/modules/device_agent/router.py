@@ -12,6 +12,8 @@ from hive.modules.device_agent.schemas import (
     DeviceAgentResponse,
     DeviceHeartbeatRequest,
     DeviceHeartbeatResponse,
+    DeviceLocationResponse,
+    DeviceLocationUpload,
 )
 from hive.modules.device_agent.service import DeviceAgentService
 
@@ -40,7 +42,7 @@ def get_device_agent_me(
     service = DeviceAgentService(db)
 
     return service.get_current_device(
-        current_device
+        current_device,
     )
 
 
@@ -64,14 +66,47 @@ async def record_device_heartbeat(
     )
 
     device_response = DeviceAgentResponse.model_validate(
-        current_device
+        current_device,
     )
 
     await device_connection_manager.broadcast_device_update(
         organization_id=current_device.organization_id,
         device=device_response.model_dump(
-            mode="json"
+            mode="json",
         ),
     )
 
     return heartbeat_response
+
+
+@router.post(
+    "/location",
+    response_model=DeviceLocationResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def upload_device_location(
+    payload: DeviceLocationUpload,
+    db: DatabaseSession,
+    current_device: CurrentDevice,
+) -> DeviceLocationResponse:
+    """Store a location report from the authenticated device."""
+
+    service = DeviceAgentService(db)
+
+    location_response = service.record_location(
+        device=current_device,
+        payload=payload,
+    )
+
+    device_response = DeviceAgentResponse.model_validate(
+        current_device,
+    )
+
+    await device_connection_manager.broadcast_device_update(
+        organization_id=current_device.organization_id,
+        device=device_response.model_dump(
+            mode="json",
+        ),
+    )
+
+    return location_response

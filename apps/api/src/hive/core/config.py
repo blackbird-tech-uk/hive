@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     jwt_secret_key: str = "H-e2JvC_RmwGQrqo54A9cmbqvhWrMZPqJe0lXG0W0OYIF5z9cxxq8pgqtgiNfcRF"
     jwt_algorithm: str = "HS256"
-    jwt_access_token_expire_minutes: int = 60
+    jwt_access_token_expire_minutes: int = 480
 
 
 @lru_cache

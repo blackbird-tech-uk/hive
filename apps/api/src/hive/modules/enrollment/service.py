@@ -168,7 +168,7 @@ class EnrollmentService:
         self,
         payload: DeviceEnrollmentRequest,
     ) -> DeviceEnrollmentResponse:
-        """Redeem an enrollment token and register a managed device."""
+        """Enroll a new device or re-enrol an existing physical device."""
 
         token_hash = self.hash_token(payload.token)
         now = utc_now()
@@ -196,51 +196,69 @@ class EnrollmentService:
             organization_id = enrollment_token.organization_id
             serial_number = payload.serial_number.strip()
 
-            asset_id = (
+            requested_asset_id = (
                 payload.asset_id.strip()
                 if payload.asset_id
-                else serial_number
+                else None
             )
 
-            imei = (
+            requested_imei = (
                 payload.imei.strip()
                 if payload.imei
                 else None
             )
 
-            self._check_device_identifiers(
-                organization_id=organization_id,
-                asset_id=asset_id,
-                serial_number=serial_number,
-                imei=imei,
+            existing_device = (
+                self.device_repository.get_by_serial_number(
+                    organization_id=organization_id,
+                    serial_number=serial_number,
+                )
             )
 
-            device = Device(
-                organization_id=organization_id,
-                hive_id=self._generate_hive_id(
-                    organization_id
-                ),
-                asset_id=asset_id,
-                serial_number=serial_number,
-                imei=imei,
-                manufacturer=self._clean_optional_text(
-                    payload.manufacturer
-                ),
-                model=payload.model.strip(),
-                android_version=self._clean_optional_text(
-                    payload.android_version
-                ),
-                build_version=self._clean_optional_text(
-                    payload.build_version
-                ),
-                status=DeviceStatus.AVAILABLE,
-                condition=DeviceCondition.GOOD,
-                device_token_version=1,
-                enrolled_at=now,
-                last_seen_at=now,
-            )
+            if existing_device is not None:
+                device = self._reenroll_existing_device(
+                    device=existing_device,
+                    payload=payload,
+                    requested_asset_id=requested_asset_id,
+                    requested_imei=requested_imei,
+                    now=now,
+                )
+            else:
+                asset_id = requested_asset_id or serial_number
 
-            self.device_repository.add(device)
+                self._check_device_identifiers(
+                    organization_id=organization_id,
+                    asset_id=asset_id,
+                    serial_number=serial_number,
+                    imei=requested_imei,
+                )
+
+                device = Device(
+                    organization_id=organization_id,
+                    hive_id=self._generate_hive_id(
+                        organization_id
+                    ),
+                    asset_id=asset_id,
+                    serial_number=serial_number,
+                    imei=requested_imei,
+                    manufacturer=self._clean_optional_text(
+                        payload.manufacturer
+                    ),
+                    model=payload.model.strip(),
+                    android_version=self._clean_optional_text(
+                        payload.android_version
+                    ),
+                    build_version=self._clean_optional_text(
+                        payload.build_version
+                    ),
+                    status=DeviceStatus.AVAILABLE,
+                    condition=DeviceCondition.GOOD,
+                    device_token_version=1,
+                    enrolled_at=now,
+                    last_seen_at=now,
+                )
+
+                self.device_repository.add(device)
 
             enrollment_token.use_count += 1
             enrollment_token.last_used_at = now
@@ -308,6 +326,74 @@ class EnrollmentService:
             raise EnrollmentPermissionDeniedError(
                 permission_code
             )
+
+    def _reenroll_existing_device(
+        self,
+        *,
+        device: Device,
+        payload: DeviceEnrollmentRequest,
+        requested_asset_id: str | None,
+        requested_imei: str | None,
+        now: datetime,
+    ) -> Device:
+        """Re-enrol an existing device and rotate its credentials."""
+
+        organization_id = device.organization_id
+
+        if requested_asset_id is not None:
+            asset_owner = self.device_repository.get_by_asset_id(
+                organization_id=organization_id,
+                asset_id=requested_asset_id,
+            )
+
+            if (
+                asset_owner is not None
+                and asset_owner.id != device.id
+            ):
+                raise EnrolledDeviceAlreadyExistsError(
+                    "asset_id",
+                    requested_asset_id,
+                )
+
+            device.asset_id = requested_asset_id
+
+        if requested_imei is not None:
+            imei_owner = self.device_repository.get_by_imei(
+                organization_id=organization_id,
+                imei=requested_imei,
+            )
+
+            if (
+                imei_owner is not None
+                and imei_owner.id != device.id
+            ):
+                raise EnrolledDeviceAlreadyExistsError(
+                    "imei",
+                    requested_imei,
+                )
+
+            device.imei = requested_imei
+
+        device.manufacturer = self._clean_optional_text(
+            payload.manufacturer
+        )
+        device.model = payload.model.strip()
+        device.android_version = self._clean_optional_text(
+            payload.android_version
+        )
+        device.build_version = self._clean_optional_text(
+            payload.build_version
+        )
+
+        device.enrolled_at = now
+        device.last_seen_at = now
+
+        # Invalidates any previously issued JWT for this device.
+        device.device_token_version += 1
+
+        self.db.add(device)
+
+        return device
 
     def _check_device_identifiers(
         self,

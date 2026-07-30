@@ -25,9 +25,17 @@ class DeviceRepository:
         self.db = db
 
     def add(self, device: Device) -> Device:
+        """Add a device to the current transaction."""
+
         self.db.add(device)
         self.db.flush()
         return device
+
+    def delete(self, device: Device) -> None:
+        """Delete a device from the current transaction."""
+
+        self.db.delete(device)
+        self.db.flush()
 
     def get_by_id(
         self,

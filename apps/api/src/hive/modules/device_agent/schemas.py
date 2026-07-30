@@ -1,37 +1,34 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+from uuid import UUID
 
 
 class DeviceAgentResponse(BaseModel):
-    """Authenticated device details returned to the Android agent."""
+    """Information returned to an authenticated device agent."""
 
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    organization_id: uuid.UUID
+    id: UUID
+    organization_id: UUID
     hive_id: str
     asset_id: str
     serial_number: str
-    imei: str | None
-    manufacturer: str | None
+    imei: str | None = None
+    manufacturer: str | None = None
     model: str
-    android_version: str | None
-    build_version: str | None
-    agent_version: str | None
-    battery_level: int | None
-    is_charging: bool | None
-    wifi_ssid: str | None
-    ip_address: str | None
-    enrolled_at: datetime | None
-    last_seen_at: datetime | None
+    android_version: str | None = None
+    build_version: str | None = None
+    agent_version: str | None = None
+    enrolled_at: datetime | None = None
+    last_seen_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DeviceHeartbeatRequest(BaseModel):
-    """Telemetry sent by an enrolled Android device."""
+    """Telemetry submitted by a device during a heartbeat."""
 
     battery_level: int | None = Field(
         default=None,
@@ -67,12 +64,84 @@ class DeviceHeartbeatRequest(BaseModel):
     )
 
 
-class DeviceHeartbeatResponse(BaseModel):
-    """Confirmation returned after a heartbeat is accepted."""
+class DeviceCommandDelivery(BaseModel):
+    """A command delivered to an authenticated device."""
 
-    device_id: uuid.UUID
+    id: UUID
+    command: str
+    payload: dict[str, Any] | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DeviceHeartbeatResponse(BaseModel):
+    """Response returned after a successful heartbeat."""
+
+    device_id: UUID
     hive_id: str
-    accepted: bool = True
+    accepted: bool
     server_time: datetime
-    heartbeat_interval_seconds: int = 300
-    last_seen_at: datetime
+    heartbeat_interval_seconds: int
+    last_seen_at: datetime | None
+    commands: list[DeviceCommandDelivery]
+
+
+class DeviceLocationUpload(BaseModel):
+    """Location report submitted by an authenticated device."""
+
+    latitude: float = Field(
+        ge=-90,
+        le=90,
+    )
+
+    longitude: float = Field(
+        ge=-180,
+        le=180,
+    )
+
+    accuracy: float | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    altitude: float | None = None
+
+    speed: float | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    bearing: float | None = Field(
+        default=None,
+        ge=0,
+        le=360,
+    )
+
+    provider: str | None = Field(
+        default=None,
+        max_length=50,
+    )
+
+    recorded_at: datetime
+
+
+class DeviceLocationResponse(BaseModel):
+    """A location report stored by Hive."""
+
+    id: UUID
+    organization_id: UUID
+    device_id: UUID
+
+    latitude: float
+    longitude: float
+    accuracy: float | None = None
+    altitude: float | None = None
+    speed: float | None = None
+    bearing: float | None = None
+    provider: str | None = None
+
+    recorded_at: datetime
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

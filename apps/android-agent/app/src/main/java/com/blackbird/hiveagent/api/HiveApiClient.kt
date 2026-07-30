@@ -39,6 +39,30 @@ class HiveApiClient(
         )
     }
 
+    suspend fun uploadLocation(
+        deviceToken: String,
+        payload: DeviceLocationUpload,
+    ): DeviceLocationResponse {
+        val body = JSONObject().apply {
+            put("latitude", payload.latitude)
+            put("longitude", payload.longitude)
+            putNullable("accuracy", payload.accuracy)
+            putNullable("altitude", payload.altitude)
+            putNullable("speed", payload.speed)
+            putNullable("bearing", payload.bearing)
+            putNullable("provider", payload.provider)
+            put("recorded_at", payload.recordedAt)
+        }
+
+        return parseLocationResponse(
+            post(
+                path = "/device-agent/location",
+                token = deviceToken,
+                body = body,
+            ),
+        )
+    }
+
     suspend fun acknowledgeCommand(
         deviceToken: String,
         commandId: String,
@@ -108,12 +132,15 @@ class HiveApiClient(
                     "application/json",
                 )
 
-                connection.outputStream.bufferedWriter().use {
-                    it.write(body.toString())
-                }
+                connection.outputStream
+                    .bufferedWriter()
+                    .use { writer ->
+                        writer.write(body.toString())
+                    }
             }
 
             val statusCode = connection.responseCode
+
             val stream = if (statusCode in 200..299) {
                 connection.inputStream
             } else {
@@ -122,12 +149,19 @@ class HiveApiClient(
 
             val responseText = stream
                 ?.bufferedReader()
-                ?.use { it.readText() }
+                ?.use { reader ->
+                    reader.readText()
+                }
                 .orEmpty()
 
             if (statusCode !in 200..299) {
                 throw HiveApiException(
-                    message = "Hive API returned HTTP $statusCode: $responseText",
+                    message = buildString {
+                        append("Hive API returned HTTP ")
+                        append(statusCode)
+                        append(": ")
+                        append(responseText)
+                    },
                     statusCode = statusCode,
                 )
             }
@@ -145,20 +179,28 @@ class HiveApiClient(
     private fun parseHeartbeatResponse(
         json: JSONObject,
     ): DeviceHeartbeatResponse {
-        val commandsJson = json.optJSONArray("commands") ?: JSONArray()
+        val commandsJson =
+            json.optJSONArray("commands") ?: JSONArray()
 
         val commands = buildList {
             for (index in 0 until commandsJson.length()) {
-                val commandJson = commandsJson.getJSONObject(index)
+                val commandJson =
+                    commandsJson.getJSONObject(index)
 
                 add(
                     DeviceCommand(
                         id = commandJson.getString("id"),
-                        command = commandJson.getString("command"),
-                        payload = parsePayload(
-                            commandJson.optJSONObject("payload"),
+                        command = commandJson.getString(
+                            "command",
                         ),
-                        createdAt = commandJson.getString("created_at"),
+                        payload = parsePayload(
+                            commandJson.optJSONObject(
+                                "payload",
+                            ),
+                        ),
+                        createdAt = commandJson.getString(
+                            "created_at",
+                        ),
                     ),
                 )
             }
@@ -167,12 +209,50 @@ class HiveApiClient(
         return DeviceHeartbeatResponse(
             deviceId = json.getString("device_id"),
             hiveId = json.getString("hive_id"),
-            accepted = json.optBoolean("accepted", true),
+            accepted = json.optBoolean(
+                "accepted",
+                true,
+            ),
             heartbeatIntervalSeconds = json.optInt(
                 "heartbeat_interval_seconds",
                 300,
             ),
             commands = commands,
+        )
+    }
+
+    private fun parseLocationResponse(
+        json: JSONObject,
+    ): DeviceLocationResponse {
+        return DeviceLocationResponse(
+            id = json.getString("id"),
+            organizationId = json.getString(
+                "organization_id",
+            ),
+            deviceId = json.getString("device_id"),
+            latitude = json.getDouble("latitude"),
+            longitude = json.getDouble("longitude"),
+            accuracy = json.optNullableFloat(
+                "accuracy",
+            ),
+            altitude = json.optNullableDouble(
+                "altitude",
+            ),
+            speed = json.optNullableFloat(
+                "speed",
+            ),
+            bearing = json.optNullableFloat(
+                "bearing",
+            ),
+            provider = json.optNullableString(
+                "provider",
+            ),
+            recordedAt = json.getString(
+                "recorded_at",
+            ),
+            createdAt = json.getString(
+                "created_at",
+            ),
         )
     }
 
@@ -189,7 +269,15 @@ class HiveApiClient(
             while (keys.hasNext()) {
                 val key = keys.next()
                 val value = json.opt(key)
-                put(key, if (value == JSONObject.NULL) null else value)
+
+                put(
+                    key,
+                    if (value == JSONObject.NULL) {
+                        null
+                    } else {
+                        value
+                    },
+                )
             }
         }
     }
@@ -198,6 +286,39 @@ class HiveApiClient(
         key: String,
         value: Any?,
     ) {
-        put(key, value ?: JSONObject.NULL)
+        put(
+            key,
+            value ?: JSONObject.NULL,
+        )
+    }
+
+    private fun JSONObject.optNullableString(
+        key: String,
+    ): String? {
+        if (!has(key) || isNull(key)) {
+            return null
+        }
+
+        return optString(key)
+            .trim()
+            .takeIf { value ->
+                value.isNotEmpty()
+            }
+    }
+
+    private fun JSONObject.optNullableDouble(
+        key: String,
+    ): Double? {
+        if (!has(key) || isNull(key)) {
+            return null
+        }
+
+        return optDouble(key)
+    }
+
+    private fun JSONObject.optNullableFloat(
+        key: String,
+    ): Float? {
+        return optNullableDouble(key)?.toFloat()
     }
 }

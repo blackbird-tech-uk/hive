@@ -17,6 +17,8 @@ class DeviceCommandType(str, enum.Enum):
     LOCK_DEVICE = "LOCK_DEVICE"
     REBOOT = "REBOOT"
     SYNC = "SYNC"
+    PING = "PING"
+    RING = "RING"
     REFRESH_APPS = "REFRESH_APPS"
     SHOW_MESSAGE = "SHOW_MESSAGE"
     REQUEST_LOCATION = "REQUEST_LOCATION"

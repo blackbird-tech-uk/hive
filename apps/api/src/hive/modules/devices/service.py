@@ -24,7 +24,9 @@ class DeviceAlreadyExistsError(Exception):
     def __init__(self, field: str, value: str) -> None:
         self.field = field
         self.value = value
-        super().__init__(f"A device with {field} '{value}' already exists.")
+        super().__init__(
+            f"A device with {field} '{value}' already exists."
+        )
 
 
 class DeviceNotFoundError(Exception):
@@ -39,7 +41,19 @@ class DevicePermissionDeniedError(Exception):
 
     def __init__(self, permission_code: str) -> None:
         self.permission_code = permission_code
-        super().__init__(f"Permission '{permission_code}' is required.")
+        super().__init__(
+            f"Permission '{permission_code}' is required."
+        )
+
+
+class DeviceDeletionError(Exception):
+    """Raised when a device cannot safely be deleted."""
+
+    def __init__(self, device_id: object) -> None:
+        super().__init__(
+            f"Device '{device_id}' could not be deleted because "
+            "related records still reference it."
+        )
 
 
 class DeviceService:
@@ -74,8 +88,12 @@ class DeviceService:
             serial_number=payload.serial_number.strip(),
             imei=payload.imei.strip() if payload.imei else None,
             model=payload.model.strip(),
-            android_version=self._clean_optional_text(payload.android_version),
-            build_version=self._clean_optional_text(payload.build_version),
+            android_version=self._clean_optional_text(
+                payload.android_version
+            ),
+            build_version=self._clean_optional_text(
+                payload.build_version
+            ),
             condition=payload.condition,
             notes=self._clean_optional_text(payload.notes),
         )
@@ -130,7 +148,10 @@ class DeviceService:
             actor=actor,
             permission_code="devices.read",
         )
-        return self.repository.list_for_organization(organization_id)
+
+        return self.repository.list_for_organization(
+            organization_id
+        )
 
     def update_device(
         self,
@@ -150,6 +171,7 @@ class DeviceService:
             organization_id=organization_id,
             device_id=device_id,
         )
+
         if device is None:
             raise DeviceNotFoundError(device_id)
 
@@ -157,55 +179,92 @@ class DeviceService:
 
         if "asset_id" in updates:
             new_asset_id = updates["asset_id"].strip()
+
             existing = self.repository.get_by_asset_id(
                 organization_id=organization_id,
                 asset_id=new_asset_id,
             )
-            if existing is not None and existing.id != device.id:
-                raise DeviceAlreadyExistsError("asset_id", new_asset_id)
+
+            if (
+                existing is not None
+                and existing.id != device.id
+            ):
+                raise DeviceAlreadyExistsError(
+                    "asset_id",
+                    new_asset_id,
+                )
+
             device.asset_id = new_asset_id
 
         if "serial_number" in updates:
-            new_serial_number = updates["serial_number"].strip()
+            new_serial_number = updates[
+                "serial_number"
+            ].strip()
+
             existing = self.repository.get_by_serial_number(
                 organization_id=organization_id,
                 serial_number=new_serial_number,
             )
-            if existing is not None and existing.id != device.id:
+
+            if (
+                existing is not None
+                and existing.id != device.id
+            ):
                 raise DeviceAlreadyExistsError(
                     "serial_number",
                     new_serial_number,
                 )
+
             device.serial_number = new_serial_number
 
         if "imei" in updates:
             raw_imei = updates["imei"]
-            new_imei = raw_imei.strip() if raw_imei else None
+            new_imei = (
+                raw_imei.strip()
+                if raw_imei
+                else None
+            )
+
             if new_imei is not None:
                 existing = self.repository.get_by_imei(
                     organization_id=organization_id,
                     imei=new_imei,
                 )
-                if existing is not None and existing.id != device.id:
-                    raise DeviceAlreadyExistsError("imei", new_imei)
+
+                if (
+                    existing is not None
+                    and existing.id != device.id
+                ):
+                    raise DeviceAlreadyExistsError(
+                        "imei",
+                        new_imei,
+                    )
+
             device.imei = new_imei
 
         if "model" in updates:
             device.model = updates["model"].strip()
+
         if "android_version" in updates:
             device.android_version = self._clean_optional_text(
                 updates["android_version"]
             )
+
         if "build_version" in updates:
             device.build_version = self._clean_optional_text(
                 updates["build_version"]
             )
+
         if "status" in updates:
             device.status = updates["status"]
+
         if "condition" in updates:
             device.condition = updates["condition"]
+
         if "notes" in updates:
-            device.notes = self._clean_optional_text(updates["notes"])
+            device.notes = self._clean_optional_text(
+                updates["notes"]
+            )
 
         try:
             self.db.commit()
@@ -221,6 +280,41 @@ class DeviceService:
             raise
 
         return device
+
+    def delete_device(
+        self,
+        *,
+        organization_id: uuid.UUID,
+        device_id: uuid.UUID,
+        actor: User,
+    ) -> None:
+        """Permanently remove a device from an organization."""
+
+        # Reuse an existing permission until a dedicated
+        # devices.delete permission is added to the RBAC seed.
+        self._require_permission(
+            organization_id=organization_id,
+            actor=actor,
+            permission_code="devices.update",
+        )
+
+        device = self.repository.get_by_id(
+            organization_id=organization_id,
+            device_id=device_id,
+        )
+
+        if device is None:
+            raise DeviceNotFoundError(device_id)
+
+        try:
+            self.repository.delete(device)
+            self.db.commit()
+        except IntegrityError:
+            self.db.rollback()
+            raise DeviceDeletionError(device_id) from None
+        except Exception:
+            self.db.rollback()
+            raise
 
     def issue_device_token(
         self,
@@ -241,6 +335,7 @@ class DeviceService:
             organization_id=organization_id,
             device_id=device_id,
         )
+
         if device is None:
             raise DeviceNotFoundError(device_id)
 
@@ -257,8 +352,12 @@ class DeviceService:
             subject=str(device.id),
             additional_claims={
                 "type": "device",
-                "organization_id": str(device.organization_id),
-                "token_version": device.device_token_version,
+                "organization_id": str(
+                    device.organization_id
+                ),
+                "token_version": (
+                    device.device_token_version
+                ),
             },
         )
 
@@ -279,13 +378,18 @@ class DeviceService:
         actor: User,
         permission_code: str,
     ) -> None:
-        has_permission = self.repository.user_has_permission(
-            organization_id=organization_id,
-            user_id=actor.id,
-            permission_code=permission_code,
+        has_permission = (
+            self.repository.user_has_permission(
+                organization_id=organization_id,
+                user_id=actor.id,
+                permission_code=permission_code,
+            )
         )
+
         if not has_permission:
-            raise DevicePermissionDeniedError(permission_code)
+            raise DevicePermissionDeniedError(
+                permission_code
+            )
 
     def _check_for_duplicates(
         self,
@@ -300,7 +404,10 @@ class DeviceService:
             organization_id=organization_id,
             asset_id=asset_id,
         ):
-            raise DeviceAlreadyExistsError("asset_id", asset_id)
+            raise DeviceAlreadyExistsError(
+                "asset_id",
+                asset_id,
+            )
 
         if self.repository.get_by_serial_number(
             organization_id=organization_id,
@@ -313,26 +420,43 @@ class DeviceService:
 
         if payload.imei:
             imei = payload.imei.strip()
+
             if self.repository.get_by_imei(
                 organization_id=organization_id,
                 imei=imei,
             ):
-                raise DeviceAlreadyExistsError("imei", imei)
+                raise DeviceAlreadyExistsError(
+                    "imei",
+                    imei,
+                )
 
-    def _generate_hive_id(self, organization_id: uuid.UUID) -> str:
+    def _generate_hive_id(
+        self,
+        organization_id: uuid.UUID,
+    ) -> str:
         for _ in range(20):
-            candidate = f"HB-{secrets.token_hex(3).upper()}"
+            candidate = (
+                f"HB-{secrets.token_hex(3).upper()}"
+            )
+
             existing = self.repository.get_by_hive_id(
                 organization_id=organization_id,
                 hive_id=candidate,
             )
+
             if existing is None:
                 return candidate
-        raise RuntimeError("Unable to generate a unique Hive ID.")
+
+        raise RuntimeError(
+            "Unable to generate a unique Hive ID."
+        )
 
     @staticmethod
-    def _clean_optional_text(value: str | None) -> str | None:
+    def _clean_optional_text(
+        value: str | None,
+    ) -> str | None:
         if value is None:
             return None
+
         cleaned = value.strip()
         return cleaned or None
