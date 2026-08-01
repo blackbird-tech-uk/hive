@@ -18,7 +18,9 @@ from hive.modules.device_agent.schemas import (
 from hive.modules.device_commands.repository import (
     DeviceCommandRepository,
 )
-from hive.modules.device_locations.models import DeviceLocation
+from hive.modules.device_locations.models import (
+    DeviceLocation,
+)
 from hive.modules.devices.models import Device
 
 
@@ -42,7 +44,9 @@ class DeviceAgentService:
     ) -> DeviceAgentResponse:
         """Return information about the authenticated device."""
 
-        return DeviceAgentResponse.model_validate(device)
+        return DeviceAgentResponse.model_validate(
+            device,
+        )
 
     def record_heartbeat(
         self,
@@ -57,37 +61,60 @@ class DeviceAgentService:
         device.last_seen_at = now
 
         if payload.battery_level is not None:
-            device.battery_level = payload.battery_level
+            device.battery_level = (
+                payload.battery_level
+            )
 
         if payload.is_charging is not None:
-            device.is_charging = payload.is_charging
+            device.is_charging = (
+                payload.is_charging
+            )
 
         if payload.wifi_ssid is not None:
-            device.wifi_ssid = self._clean_optional_text(
-                payload.wifi_ssid,
+            device.wifi_ssid = (
+                self._clean_optional_text(
+                    payload.wifi_ssid,
+                )
             )
 
         if payload.ip_address is not None:
-            device.ip_address = self._clean_optional_text(
-                payload.ip_address,
+            device.ip_address = (
+                self._clean_optional_text(
+                    payload.ip_address,
+                )
+            )
+
+        if payload.imei is not None:
+            device.imei = (
+                self._clean_optional_text(
+                    payload.imei,
+                )
             )
 
         if payload.agent_version is not None:
-            device.agent_version = self._clean_optional_text(
-                payload.agent_version,
+            device.agent_version = (
+                self._clean_optional_text(
+                    payload.agent_version,
+                )
             )
 
         if payload.android_version is not None:
-            device.android_version = self._clean_optional_text(
-                payload.android_version,
+            device.android_version = (
+                self._clean_optional_text(
+                    payload.android_version,
+                )
             )
 
         if payload.build_version is not None:
-            device.build_version = self._clean_optional_text(
-                payload.build_version,
+            device.build_version = (
+                self._clean_optional_text(
+                    payload.build_version,
+                )
             )
 
-        delivered_commands: list[DeviceCommandDelivery] = []
+        delivered_commands: list[
+            DeviceCommandDelivery
+        ] = []
 
         try:
             self.repository.update_last_seen(
@@ -96,20 +123,25 @@ class DeviceAgentService:
             )
 
             pending_commands = (
-                self.commands.list_pending_for_device(
+                self.commands
+                .list_pending_for_device(
                     device.id,
                 )
             )
 
             for command in pending_commands:
-                self.commands.mark_sent(command)
+                self.commands.mark_sent(
+                    command,
+                )
 
                 delivered_commands.append(
                     DeviceCommandDelivery(
                         id=command.id,
                         command=command.command,
                         payload=command.payload,
-                        created_at=command.created_at,
+                        created_at=(
+                            command.created_at
+                        ),
                     )
                 )
 
@@ -149,15 +181,19 @@ class DeviceAgentService:
             altitude=payload.altitude,
             speed=payload.speed,
             bearing=payload.bearing,
-            provider=self._clean_optional_text(
-                payload.provider,
+            provider=(
+                self._clean_optional_text(
+                    payload.provider,
+                )
             ),
             recorded_at=payload.recorded_at,
         )
 
         try:
-            saved_location = self.repository.add_location(
-                location,
+            saved_location = (
+                self.repository.add_location(
+                    location,
+                )
             )
 
             self.repository.update_last_seen(

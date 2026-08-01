@@ -193,9 +193,8 @@ export interface CreateEnrollmentTokenPayload {
   max_uses?: number
 }
 
-export interface EnrollmentTokenResponse {
+export interface EnrollmentTokenCreatedResponse {
   id: string
-
   organization_id: string
 
   token: string
@@ -207,6 +206,23 @@ export interface EnrollmentTokenResponse {
   use_count: number
 
   expires_at: string
+  created_at: string
+}
+
+export interface EnrollmentTokenResponse {
+  id: string
+  organization_id: string
+  created_by_user_id: string
+
+  token_prefix: string
+  label: string | null
+
+  max_uses: number
+  use_count: number
+
+  expires_at: string
+  revoked_at: string | null
+  last_used_at: string | null
   created_at: string
 }
 

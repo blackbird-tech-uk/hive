@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
+import com.blackbird.hiveagent.BuildConfig
 
 data class HiveUiState(
     val isLoading: Boolean = true,
@@ -44,69 +45,75 @@ class HiveViewModel(
         _uiState.asStateFlow()
 
     fun loadDevice() {
-        viewModelScope.launch {
-            Log.d(
-                LOG_TAG,
-                "Loading local enrolment",
+    viewModelScope.launch {
+        Log.d(
+            LOG_TAG,
+            "Loading local enrolment",
+        )
+
+        _uiState.value =
+            HiveUiState(
+                isLoading = true,
             )
 
-            _uiState.value =
-                HiveUiState(
-                    isLoading = true,
-                )
+        try {
+            val storedToken =
+                tokenStorage.getDeviceToken()
 
-            try {
-                val storedToken =
-                    tokenStorage.getDeviceToken()
+            val storedServerUrl =
+                tokenStorage.getServerUrl()
 
-                if (storedToken.isNullOrBlank()) {
-                    Log.d(
-                        LOG_TAG,
-                        "No stored device token was found",
-                    )
-
-                    HeartbeatScheduler.cancel(
-                        applicationContext,
-                    )
-
-                    _uiState.value =
-                        HiveUiState(
-                            isLoading = false,
-                            isEnrolled = false,
-                        )
-
-                    return@launch
-                }
-
+            if (storedToken.isNullOrBlank()) {
                 Log.d(
                     LOG_TAG,
-                    "Stored device token found",
+                    "No stored device token was found",
                 )
 
-                loadDeviceWithToken(
-                    deviceToken = storedToken,
-                )
-            } catch (error: Exception) {
-                Log.e(
-                    LOG_TAG,
-                    "Failed to load local enrolment",
-                    error,
+                HeartbeatScheduler.cancel(
+                    applicationContext,
                 )
 
                 _uiState.value =
                     HiveUiState(
                         isLoading = false,
                         isEnrolled = false,
-                        error = readableError(error),
                     )
+
+                return@launch
             }
+
+            Log.d(
+                LOG_TAG,
+                "Stored device token found",
+            )
+
+            loadDeviceWithToken(
+                deviceToken = storedToken,
+                serverUrl = storedServerUrl,
+            )
+        } catch (error: Exception) {
+            Log.e(
+                LOG_TAG,
+                "Failed to load local enrolment",
+                error,
+            )
+
+            _uiState.value =
+                HiveUiState(
+                    isLoading = false,
+                    isEnrolled = false,
+                    error = readableError(error),
+                )
         }
     }
+}
 
-    fun enrolDevice(
-        enrollmentToken: String,
-        assetId: String,
-    ) {
+ fun enrolDevice(
+    enrollmentToken: String,
+    assetId: String,
+    serverUrl: String?,
+)
+    {
         val cleanEnrollmentToken =
             enrollmentToken
                 .trim()
@@ -116,6 +123,21 @@ class HiveViewModel(
             assetId
                 .trim()
                 .uppercase()
+                val cleanServerUrl =
+    try {
+        TokenStorage.normaliseServerUrl(
+            serverUrl
+                ?.takeIf { it.isNotBlank() }
+                ?: BuildConfig.API_BASE_URL,
+        )
+    } catch (error: IllegalArgumentException) {
+        _uiState.value =
+            _uiState.value.copy(
+                error = error.message,
+            )
+
+        return
+    }
 
         if (cleanEnrollmentToken.isBlank()) {
             _uiState.value =
@@ -173,10 +195,12 @@ class HiveViewModel(
                     "Sending enrolment request",
                 )
 
-                val response =
-                    ApiClient.api.redeemEnrollment(
-                        request = request,
-                    )
+               val response =
+    ApiClient
+        .create(cleanServerUrl)
+        .redeemEnrollment(
+            request = request,
+        )
 
                 val deviceToken =
                     response.device_token.trim()
@@ -192,16 +216,43 @@ class HiveViewModel(
                     "Enrolment accepted. Saving device token.",
                 )
 
-                tokenStorage.saveDeviceToken(
-                    token = deviceToken,
-                )
+              tokenStorage.saveEnrollment(
+    token = deviceToken,
+    serverUrl = cleanServerUrl,
+)
 
-                /*
-                 * Read the token back before making any other
-                 * request or scheduling WorkManager.
-                 */
-                val storedToken =
-                    tokenStorage.getDeviceToken()
+/*
+ * Read the credentials back before making any
+ * other request or scheduling WorkManager.
+ */
+val storedToken =
+    tokenStorage.getDeviceToken()
+
+val storedServerUrl =
+    tokenStorage.getServerUrl()
+
+if (storedToken.isNullOrBlank()) {
+    throw IllegalStateException(
+        "The device token could not be read after saving.",
+    )
+}
+
+if (storedToken != deviceToken) {
+    throw IllegalStateException(
+        "The stored device token does not match " +
+            "the enrolment response.",
+    )
+}
+
+Log.d(
+    LOG_TAG,
+    "Device token saved and verified",
+)
+
+loadDeviceWithToken(
+    deviceToken = storedToken,
+    serverUrl = storedServerUrl,
+)
 
                 if (storedToken.isNullOrBlank()) {
                     throw IllegalStateException(
@@ -221,9 +272,10 @@ class HiveViewModel(
                     "Device token saved and verified",
                 )
 
-                loadDeviceWithToken(
-                    deviceToken = storedToken,
-                )
+              loadDeviceWithToken(
+    deviceToken = storedToken,
+    serverUrl = storedServerUrl,
+)
             } catch (error: Exception) {
                 Log.e(
                     LOG_TAG,
@@ -264,8 +316,10 @@ class HiveViewModel(
     }
 
     private suspend fun loadDeviceWithToken(
-        deviceToken: String,
-    ) {
+    deviceToken: String,
+    serverUrl: String,
+)
+{
         try {
             Log.d(
                 LOG_TAG,
@@ -273,10 +327,12 @@ class HiveViewModel(
             )
 
             val device =
-                ApiClient.api.getDevice(
-                    authorization =
-                        "Bearer $deviceToken",
-                )
+    ApiClient
+        .create(serverUrl)
+        .getDevice(
+            authorization =
+                "Bearer $deviceToken",
+        )
 
             Log.d(
                 LOG_TAG,

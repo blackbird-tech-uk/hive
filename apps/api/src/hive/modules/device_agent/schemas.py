@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-from uuid import UUID
 
 
 class DeviceAgentResponse(BaseModel):
@@ -21,10 +21,16 @@ class DeviceAgentResponse(BaseModel):
     android_version: str | None = None
     build_version: str | None = None
     agent_version: str | None = None
+    battery_level: int | None = None
+    is_charging: bool | None = None
+    wifi_ssid: str | None = None
+    ip_address: str | None = None
     enrolled_at: datetime | None = None
     last_seen_at: datetime | None = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
 
 
 class DeviceHeartbeatRequest(BaseModel):
@@ -46,6 +52,13 @@ class DeviceHeartbeatRequest(BaseModel):
     ip_address: str | None = Field(
         default=None,
         max_length=45,
+    )
+
+    imei: str | None = Field(
+        default=None,
+        min_length=15,
+        max_length=15,
+        pattern=r"^\d{15}$",
     )
 
     agent_version: str | None = Field(
@@ -72,7 +85,9 @@ class DeviceCommandDelivery(BaseModel):
     payload: dict[str, Any] | None = None
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
 
 
 class DeviceHeartbeatResponse(BaseModel):
@@ -144,4 +159,6 @@ class DeviceLocationResponse(BaseModel):
     recorded_at: datetime
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+    )

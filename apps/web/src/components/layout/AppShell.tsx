@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
+  QrCode,
   Settings,
   Smartphone,
 } from 'lucide-react'
@@ -29,6 +30,11 @@ const navigationItems = [
     label: 'Devices',
     to: '/devices',
     icon: Smartphone,
+  },
+  {
+    label: 'Enrollments',
+    to: '/enrollments',
+    icon: QrCode,
   },
   {
     label: 'Events',
@@ -108,6 +114,7 @@ export function AppShell({
 
   function handleLogout() {
     logout()
+
     navigate('/login', {
       replace: true,
     })
@@ -182,8 +189,8 @@ export function AppShell({
                 to={item.to}
               >
                 <Icon
-                  size={18}
                   aria-hidden="true"
+                  size={18}
                 />
 
                 <span>{item.label}</span>
@@ -214,8 +221,8 @@ export function AppShell({
               type="button"
             >
               <LogOut
-                size={18}
                 aria-hidden="true"
+                size={18}
               />
             </button>
           </div>

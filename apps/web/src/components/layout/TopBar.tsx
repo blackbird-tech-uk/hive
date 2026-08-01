@@ -1,4 +1,7 @@
-import { Bell, RefreshCw } from 'lucide-react'
+import {
+  Bell,
+  RefreshCw,
+} from 'lucide-react'
 
 interface TopBarProps {
   isLoading?: boolean
@@ -10,22 +13,17 @@ export function TopBar({
   onRefresh,
 }: TopBarProps) {
   return (
-    <header className="page-header">
-      <div>
-        <p className="eyebrow">DEVICE OPERATIONS</p>
-        <h2>Devices</h2>
-        <p className="page-description">
-          Monitor and manage every scanner registered with Hive.
-        </p>
-      </div>
-
+    <div className="topbar">
       <div className="topbar-actions">
         <button
-          className="icon-button"
           aria-label="Notifications"
+          className="icon-button"
           type="button"
         >
-          <Bell size={17} aria-hidden="true" />
+          <Bell
+            aria-hidden="true"
+            size={17}
+          />
         </button>
 
         <button
@@ -34,10 +32,17 @@ export function TopBar({
           onClick={onRefresh}
           type="button"
         >
-          <RefreshCw size={16} aria-hidden="true" />
+          <RefreshCw
+            aria-hidden="true"
+            className={
+              isLoading ? 'spin' : ''
+            }
+            size={16}
+          />
+
           Refresh
         </button>
       </div>
-    </header>
+    </div>
   )
 }

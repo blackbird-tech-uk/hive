@@ -13,9 +13,8 @@ import QRCode from 'react-qr-code'
 
 import {
   createEnrollmentToken,
-  type EnrollmentTokenResponse,
+  type EnrollmentTokenCreatedResponse,
 } from '../../lib/api'
-
 interface EnrollmentModalProps {
   isOpen: boolean
   onClose: () => void
@@ -46,9 +45,9 @@ export function EnrollmentModal({
   )
 
   const [createdToken, setCreatedToken] =
-    useState<EnrollmentTokenResponse | null>(
-      null,
-    )
+  useState<EnrollmentTokenCreatedResponse | null>(
+    null,
+  )
 
   const [isCreating, setIsCreating] =
     useState(false)

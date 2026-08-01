@@ -10,9 +10,11 @@ import {
 } from './AuthContext'
 import { AppShell } from '../components/layout/AppShell'
 import { DashboardPage } from '../pages/Dashboard'
-import { DevicesPage } from '../pages/Devices'
-import { LoginPage } from '../pages/Login'
 import { DeviceDashboardPage } from '../pages/DeviceDashboard'
+import { DevicesPage } from '../pages/Devices'
+import { EnrollmentsPage } from '../pages/Enrollments'
+import { LoginPage } from '../pages/Login'
+
 
 function PlaceholderPage({
   eyebrow,
@@ -82,9 +84,14 @@ function ProtectedApplication() {
         />
 
         <Route
-  path="/devices"
-  element={<DevicesPage />}
-/>
+          path="/enrollments"
+          element={<EnrollmentsPage />}
+        />
+
+        <Route
+          path="/devices"
+          element={<DevicesPage />}
+        />
 
 <Route
   path="/devices/:deviceId"

@@ -1,18 +1,21 @@
 package com.blackbird.hiveagent.data.network
 
+import com.blackbird.hiveagent.BuildConfig
+import com.blackbird.hiveagent.data.local.TokenStorage
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
-
-    private const val BASE_URL =
-        "http://192.168.0.12:8000/api/v1/"
-
     private val logging =
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level =
+                if (BuildConfig.DEBUG) {
+                    HttpLoggingInterceptor.Level.BODY
+                } else {
+                    HttpLoggingInterceptor.Level.NONE
+                }
         }
 
     private val client =
@@ -20,11 +23,26 @@ object ApiClient {
             .addInterceptor(logging)
             .build()
 
-    val api: HiveApi =
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
+    fun create(
+        serverUrl: String,
+    ): HiveApi {
+        val normalisedUrl =
+            TokenStorage.normaliseServerUrl(
+                serverUrl,
+            )
+
+        return Retrofit.Builder()
+            .baseUrl("$normalisedUrl/")
             .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(
+                GsonConverterFactory.create(),
+            )
             .build()
             .create(HiveApi::class.java)
+    }
+
+    val api: HiveApi
+        get() = create(
+            BuildConfig.API_BASE_URL,
+        )
 }
