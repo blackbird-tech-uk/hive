@@ -12,6 +12,7 @@ import { AppShell } from '../components/layout/AppShell'
 import { DashboardPage } from '../pages/Dashboard'
 import { DevicesPage } from '../pages/Devices'
 import { LoginPage } from '../pages/Login'
+import { DeviceDashboardPage } from '../pages/DeviceDashboard'
 
 function PlaceholderPage({
   eyebrow,
@@ -81,9 +82,14 @@ function ProtectedApplication() {
         />
 
         <Route
-          path="/devices"
-          element={<DevicesPage />}
-        />
+  path="/devices"
+  element={<DevicesPage />}
+/>
+
+<Route
+  path="/devices/:deviceId"
+  element={<DeviceDashboardPage />}
+/>
 
         <Route
           path="/events"

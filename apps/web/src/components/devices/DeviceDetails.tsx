@@ -3,8 +3,13 @@ import {
   useEffect,
   useState,
 } from 'react'
+
+import { Link } from 'react-router-dom'
+
 import {
+  BatteryCharging,
   Bell,
+  Clock3,
   History,
   MapPin,
   MessageSquare,
@@ -12,6 +17,8 @@ import {
   RefreshCw,
   Save,
   Send,
+  Smartphone,
+  Wifi,
   X,
 } from 'lucide-react'
 
@@ -62,6 +69,59 @@ function formatCommandTime(
   }
 
   return timestamp.toLocaleString('en-GB')
+}
+function formatRelativeTime(
+  value: string | null | undefined,
+): string {
+  if (!value) {
+    return 'Never reported'
+  }
+
+  const timestamp = new Date(value)
+
+  if (Number.isNaN(timestamp.getTime())) {
+    return 'Unknown'
+  }
+
+  const differenceSeconds = Math.floor(
+    (Date.now() - timestamp.getTime()) / 1000,
+  )
+
+  if (differenceSeconds < 10) {
+    return 'Just now'
+  }
+
+  if (differenceSeconds < 60) {
+    return `${differenceSeconds} seconds ago`
+  }
+
+  const differenceMinutes = Math.floor(
+    differenceSeconds / 60,
+  )
+
+  if (differenceMinutes < 60) {
+    return `${differenceMinutes} ${
+      differenceMinutes === 1 ? 'minute' : 'minutes'
+    } ago`
+  }
+
+  const differenceHours = Math.floor(
+    differenceMinutes / 60,
+  )
+
+  if (differenceHours < 24) {
+    return `${differenceHours} ${
+      differenceHours === 1 ? 'hour' : 'hours'
+    } ago`
+  }
+
+  const differenceDays = Math.floor(
+    differenceHours / 24,
+  )
+
+  return `${differenceDays} ${
+    differenceDays === 1 ? 'day' : 'days'
+  } ago`
 }
 
 function getCommandStatusClass(
@@ -373,14 +433,116 @@ export function DeviceDetails({
       </header>
 
       <div className="device-details-status">
-        <StatusBadge status={device.status} />
+  <StatusBadge status={device.status} />
 
-        <span className="badge subtle-badge">
-          {formatLabel(device.condition)}
-        </span>
-      </div>
+  <span className="badge subtle-badge">
+    {formatLabel(device.condition)}
+  </span>
+</div>
 
-      <dl className="device-details-grid">
+<Link
+  className="device-details-dashboard-link"
+  to={`/devices/${device.id}`}
+>
+  Open full device dashboard
+</Link>
+
+<section
+  aria-label="Device status summary"
+  className="device-summary-grid"
+>
+  <article className="device-summary-card">
+    <span className="device-summary-icon">
+      <BatteryCharging
+        aria-hidden="true"
+        size={20}
+      />
+    </span>
+
+    <div className="device-summary-content">
+      <span>Battery</span>
+
+      <strong>
+        {device.battery_level !== null
+          ? `${device.battery_level}%`
+          : 'Unknown'}
+      </strong>
+
+      <small>
+        {device.is_charging === null
+          ? 'Charging state unknown'
+          : device.is_charging
+            ? 'Currently charging'
+            : 'Not charging'}
+      </small>
+    </div>
+  </article>
+
+  <article className="device-summary-card">
+    <span className="device-summary-icon">
+      <Wifi
+        aria-hidden="true"
+        size={20}
+      />
+    </span>
+
+    <div className="device-summary-content">
+      <span>Connectivity</span>
+
+      <strong>
+        {device.wifi_ssid ?? 'Not connected'}
+      </strong>
+
+      <small>
+        {device.ip_address ?? 'No IP reported'}
+      </small>
+    </div>
+  </article>
+
+  <article className="device-summary-card">
+    <span className="device-summary-icon">
+      <Smartphone
+        aria-hidden="true"
+        size={20}
+      />
+    </span>
+
+    <div className="device-summary-content">
+      <span>Platform</span>
+
+      <strong>
+        Android {device.android_version ?? 'Unknown'}
+      </strong>
+
+      <small>
+        Agent {device.agent_version ?? 'Unknown'}
+      </small>
+    </div>
+  </article>
+
+  <article className="device-summary-card">
+    <span className="device-summary-icon">
+      <Clock3
+        aria-hidden="true"
+        size={20}
+      />
+    </span>
+
+    <div className="device-summary-content">
+      <span>Last heartbeat</span>
+
+      <strong>
+        {formatRelativeTime(device.last_seen_at)}
+      </strong>
+
+      <small>
+        {formatCommandTime(device.last_seen_at)}
+      </small>
+    </div>
+  </article>
+</section>
+
+<dl className="device-details-grid">
         <div>
           <dt>Asset ID</dt>
           <dd>
