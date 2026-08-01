@@ -160,6 +160,11 @@ function getCommandActivityTime(
 }
 
 export function DeviceDashboardPage() {
+const [activeTab, setActiveTab] =
+  useState<'overview' | 'activity'>(
+    'overview',
+  )
+
   const { deviceId } = useParams<{
     deviceId: string
   }>()
@@ -783,47 +788,61 @@ useEffect(() => {
         className="device-dashboard-tabs"
       >
         <button
-          className="device-dashboard-tab device-dashboard-tab-active"
+          className={
+            activeTab === 'overview'
+              ? 'device-dashboard-tab device-dashboard-tab-active'
+              : 'device-dashboard-tab'
+          }
+          onClick={() =>
+            setActiveTab('overview')
+          }
           type="button"
         >
           Overview
         </button>
 
         <button
-          disabled
-          className="device-dashboard-tab"
+          className={
+            activeTab === 'activity'
+              ? 'device-dashboard-tab device-dashboard-tab-active'
+              : 'device-dashboard-tab'
+          }
+          onClick={() =>
+            setActiveTab('activity')
+          }
           type="button"
         >
           Activity
         </button>
 
         <button
-          disabled
           className="device-dashboard-tab"
+          disabled
           type="button"
         >
           Commands
         </button>
 
         <button
-          disabled
           className="device-dashboard-tab"
+          disabled
           type="button"
         >
           Location
         </button>
 
         <button
-          disabled
           className="device-dashboard-tab"
+          disabled
           type="button"
         >
           Notes
         </button>
       </nav>
 
-      <div className="device-dashboard-layout">
-        <main className="device-dashboard-main">
+      {activeTab === 'overview' && (
+        <div className="device-dashboard-layout">
+          <main className="device-dashboard-main">
           <section className="device-dashboard-panel">
             <div className="device-dashboard-panel-header">
               <div>
@@ -907,113 +926,7 @@ useEffect(() => {
               </div>
             </dl>
           </section>
-          <main className="device-dashboard-main"></main>
-          <section className="device-dashboard-panel">
-  <div className="device-dashboard-panel-header">
-    <div>
-      <p className="eyebrow">
-        DEVICE ACTIVITY
-      </p>
-
-      <h2>Recent activity</h2>
-    </div>
-
-    <button
-      aria-label="Refresh device activity"
-      className="icon-button"
-      disabled={commandsLoading}
-      onClick={() =>
-        void loadCommands(true)
-      }
-      type="button"
-    >
-      <RefreshCw
-  aria-hidden="true"
-  size={17}
-  className={
-    commandsLoading ? "spin" : ""
-  }
-/>
-      
-    </button>
-  </div>
-
-  {commandsLoading && commands.length === 0 ? (
-    <div className="device-dashboard-empty">
-      <p>Loading device activity...</p>
-    </div>
-  ) : commandsError ? (
-    <p
-      className="device-dashboard-command-error"
-      role="alert"
-    >
-      {commandsError}
-    </p>
-  ) : commands.length === 0 ? (
-    <div className="device-dashboard-empty">
-      <p>
-        No command activity has been recorded
-        for this device.
-      </p>
-    </div>
-  ) : (
-    <ol className="device-activity-timeline">
-      {commands.slice(0, 12).map(
-        (command) => {
-          const activityTime =
-            getCommandActivityTime(command)
-
-          return (
-            <li
-              className="device-activity-item"
-              key={command.id}
-            >
-              <span
-                aria-hidden="true"
-                className={`device-activity-marker device-activity-marker-${command.status.toLowerCase()}`}
-              />
-
-              <div className="device-activity-content">
-                <div className="device-activity-heading">
-                  <strong>
-                    {formatCommandName(
-                      command.command,
-                    )}
-                  </strong>
-
-                  <span
-                    className={`device-activity-status device-activity-status-${command.status.toLowerCase()}`}
-                  >
-                    {formatCommandName(
-                      command.status,
-                    )}
-                  </span>
-                </div>
-
-                <p>
-                  {command.result_message ??
-                    'Command submitted to the Android agent.'}
-                </p>
-
-                <time dateTime={activityTime}>
-                  {formatRelativeTime(
-                    activityTime,
-                  )}
-                  {' · '}
-                  {formatDateTime(
-                    activityTime,
-                  )}
-                </time>
-              </div>
-            </li>
-          )
-        },
-      )}
-    </ol>
-  )}
-</section>
-        </main>
-
+          </main>
         <aside className="device-dashboard-side">
           <section className="device-dashboard-panel">
             <div className="device-dashboard-panel-header">
@@ -1176,8 +1089,116 @@ useEffect(() => {
   )}
 </div>
           </section>
-        </aside>
-      </div>
+                </aside>
+        </div>
+      )}
+
+      {activeTab === 'activity' && (
+          <section className="device-dashboard-panel">
+  <div className="device-dashboard-panel-header">
+    <div>
+      <p className="eyebrow">
+        DEVICE ACTIVITY
+      </p>
+
+      <h2>Recent activity</h2>
+    </div>
+
+    <button
+      aria-label="Refresh device activity"
+      className="icon-button"
+      disabled={commandsLoading}
+      onClick={() =>
+        void loadCommands(true)
+      }
+      type="button"
+    >
+      <RefreshCw
+  aria-hidden="true"
+  size={17}
+  className={
+    commandsLoading ? "spin" : ""
+  }
+/>
+      
+    </button>
+  </div>
+
+  {commandsLoading && commands.length === 0 ? (
+    <div className="device-dashboard-empty">
+      <p>Loading device activity...</p>
+    </div>
+  ) : commandsError ? (
+    <p
+      className="device-dashboard-command-error"
+      role="alert"
+    >
+      {commandsError}
+    </p>
+  ) : commands.length === 0 ? (
+    <div className="device-dashboard-empty">
+      <p>
+        No command activity has been recorded
+        for this device.
+      </p>
+    </div>
+  ) : (
+    <ol className="device-activity-timeline">
+      {commands.slice(0, 12).map(
+        (command) => {
+          const activityTime =
+            getCommandActivityTime(command)
+
+          return (
+            <li
+              className="device-activity-item"
+              key={command.id}
+            >
+              <span
+                aria-hidden="true"
+                className={`device-activity-marker device-activity-marker-${command.status.toLowerCase()}`}
+              />
+
+              <div className="device-activity-content">
+                <div className="device-activity-heading">
+                  <strong>
+                    {formatCommandName(
+                      command.command,
+                    )}
+                  </strong>
+
+                  <span
+                    className={`device-activity-status device-activity-status-${command.status.toLowerCase()}`}
+                  >
+                    {formatCommandName(
+                      command.status,
+                    )}
+                  </span>
+                </div>
+
+                <p>
+                  {command.result_message ??
+                    'Command submitted to the Android agent.'}
+                </p>
+
+                <time dateTime={activityTime}>
+                  {formatRelativeTime(
+                    activityTime,
+                  )}
+                  {' · '}
+                  {formatDateTime(
+                    activityTime,
+                  )}
+                </time>
+              </div>
+            </li>
+          )
+        },
+      )}
+    </ol>
+  )}
+</section>
+      )}
     </section>
   )
 }
