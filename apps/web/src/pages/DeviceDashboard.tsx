@@ -25,8 +25,14 @@ import { StatusBadge } from '../components/devices/StatusBadge'
 import {
   createDeviceCommand,
   getDevice,
+  getDeviceCommands,
+  getDeviceLocationHistory,
   type Device,
+  type DeviceCommand,
+  type DeviceLocation,
 } from '../lib/api'
+
+
 
 const DEVICE_ONLINE_THRESHOLD_MS =
   20 * 60 * 1_000
@@ -166,79 +172,194 @@ export function DeviceDashboardPage() {
   const [commandError, setCommandError] =
     useState<string | null>(null)
 
+  const [commands, setCommands] =
+  useState<DeviceCommand[]>([])
+
+const [commandsLoading, setCommandsLoading] =
+  useState(false)
+
+const [commandsError, setCommandsError] =
+  useState<string | null>(null)  
+
+    const [location, setLocation] =
+  useState<DeviceLocation | null>(null)
+
+const [locationLoading, setLocationLoading] =
+  useState(false)
+
+const [locationError, setLocationError] =
+  useState<string | null>(null)
+
   const loadDevice = useCallback(
-    async () => {
-      if (!deviceId) {
-        setError(
-          'No device ID was provided.',
+  async () => {
+    if (!deviceId) {
+      setError(
+        'No device ID was provided.',
+      )
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      const loadedDevice =
+        await getDevice(deviceId)
+
+      setDevice(loadedDevice)
+      setError(null)
+    } catch (loadError) {
+      setDevice(null)
+
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load this device.',
+      )
+    } finally {
+      setLoading(false)
+    }
+  },
+  [deviceId],
+)
+  const loadCommands = useCallback(
+  async (showLoader = false) => {
+    if (!deviceId) {
+      return
+    }
+
+    if (showLoader) {
+      setCommandsLoading(true)
+    }
+
+    try {
+      const loadedCommands =
+        await getDeviceCommands(deviceId)
+
+      setCommands(loadedCommands)
+      setCommandsError(null)
+    } catch (loadError) {
+      setCommandsError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load device activity.',
+      )
+    } finally {
+      setCommandsLoading(false)
+    }
+  },
+  [deviceId],
+)
+
+const loadLocation = useCallback(
+  async (showLoader = false) => {
+    if (!deviceId) {
+      return
+    }
+
+    if (showLoader) {
+      setLocationLoading(true)
+    }
+
+    try {
+      const locations =
+        await getDeviceLocationHistory(
+          deviceId,
+          1,
         )
-        setLoading(false)
-        return
-      }
 
-      try {
-        setLoading(true)
+      setLocation(locations[0] ?? null)
+      setLocationError(null)
+    } catch (loadError) {
+      setLocation(null)
 
-        const loadedDevice =
-          await getDevice(deviceId)
+      setLocationError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load device location.',
+      )
+    } finally {
+      setLocationLoading(false)
+    }
+  },
+  [deviceId],
+)
 
-        setDevice(loadedDevice)
-        setError(null)
-      } catch (loadError) {
-        setDevice(null)
+        const sendCommand = useCallback(
+  async (
+    command: string,
+    payload: Record<string, unknown> = {},
+  ) => {
+    if (!deviceId) {
+      return
+    }
 
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : 'Unable to load this device.',
-        )
-      } finally {
-        setLoading(false)
-      }
-    },
-    [deviceId],
-  )
+    try {
+      setSendingCommand(command)
+      setCommandNotice(null)
+      setCommandError(null)
 
-  const sendCommand = useCallback(
-    async (
-      command: string,
-      payload: Record<string, unknown> = {},
-    ) => {
-      if (!deviceId) {
-        return
-      }
-
-      try {
-        setSendingCommand(command)
-        setCommandNotice(null)
-        setCommandError(null)
-
+      const createdCommand =
         await createDeviceCommand(deviceId, {
           command,
           payload,
         })
 
-        setCommandNotice(
-          `${formatCommandName(
-            command,
-          )} command queued successfully.`,
-        )
-      } catch (sendError) {
-        setCommandError(
-          sendError instanceof Error
-            ? sendError.message
-            : 'Unable to send the device command.',
-        )
-      } finally {
-        setSendingCommand(null)
+      setCommands((currentCommands) => [
+        createdCommand,
+        ...currentCommands.filter(
+          (existingCommand) =>
+            existingCommand.id !==
+            createdCommand.id,
+        ),
+      ])
+
+      if (command === 'REQUEST_LOCATION') {
+        window.setTimeout(() => {
+          void loadLocation()
+        }, 2_000)
       }
+
+      setCommandNotice(
+        `${formatCommandName(
+          command,
+        )} command queued successfully.`,
+      )
+    } catch (sendError) {
+      setCommandError(
+        sendError instanceof Error
+          ? sendError.message
+          : 'Unable to send the device command.',
+      )
+    } finally {
+      setSendingCommand(null)
+    }
+  },
+  [deviceId, loadLocation],
+)
+
+useEffect(() => {
+  void loadDevice()
+  void loadLocation(true)
+  void loadCommands(true)
+}, [
+  loadCommands,
+  loadDevice,
+  loadLocation,
+])
+
+useEffect(() => {
+  const commandPoll = window.setInterval(
+    () => {
+      void loadCommands()
     },
-    [deviceId],
+    5_000,
   )
 
-  useEffect(() => {
-    void loadDevice()
-  }, [loadDevice])
+  return () => {
+    window.clearInterval(commandPoll)
+  }
+}, [loadCommands])
 
   if (loading) {
     return (
@@ -842,13 +963,87 @@ export function DeviceDashboardPage() {
               />
             </div>
 
-            <div className="device-dashboard-empty">
-              <p>
-                Location details will be added
-                in the next Device Dashboard
-                milestone.
-              </p>
-            </div>
+            <div className="device-dashboard-location">
+  <button
+    aria-label="Refresh latest location"
+    className="icon-button"
+    disabled={locationLoading}
+    onClick={() =>
+      void loadLocation(true)
+    }
+    type="button"
+  >
+    <RefreshCw
+      aria-hidden="true"
+      size={16}
+    />
+  </button>
+
+  {locationLoading ? (
+    <p className="device-dashboard-location-message">
+      Loading location...
+    </p>
+  ) : locationError ? (
+    <p className="device-dashboard-location-error">
+      {locationError}
+    </p>
+  ) : location ? (
+    <>
+      <div className="device-dashboard-location-grid">
+        <div>
+          <span>Latitude</span>
+          <strong>
+            {location.latitude.toFixed(6)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Longitude</span>
+          <strong>
+            {location.longitude.toFixed(6)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Accuracy</span>
+          <strong>
+  {location.accuracy == null ||
+  Number.isNaN(location.accuracy)
+    ? 'Not reported'
+    : `${Math.round(location.accuracy)} m`}
+</strong>
+        </div>
+
+        <div>
+          <span>Recorded</span>
+          <strong>
+            {formatDateTime(
+              location.recorded_at,
+            )}
+          </strong>
+        </div>
+      </div>
+
+      <a
+        className="device-dashboard-map-link"
+        href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
+        rel="noreferrer"
+        target="_blank"
+      >
+        <MapPin
+          aria-hidden="true"
+          size={16}
+        />
+
+        Open location in Google Maps
+      </a>
+    </>
+  ) : (
+    <p className="device-dashboard-location-message">
+      No location has been reported yet.
+    </p>
+  )}
+</div>
           </section>
         </aside>
       </div>
