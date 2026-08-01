@@ -1,11 +1,16 @@
 import {
   ArrowLeft,
   BatteryCharging,
+  Bell,
   Clock3,
   MapPin,
+  MessageSquare,
+  Radio,
+  RefreshCw,
   Smartphone,
   Wifi,
 } from 'lucide-react'
+
 import {
   useCallback,
   useEffect,
@@ -18,6 +23,7 @@ import {
 
 import { StatusBadge } from '../components/devices/StatusBadge'
 import {
+  createDeviceCommand,
   getDevice,
   type Device,
 } from '../lib/api'
@@ -122,6 +128,20 @@ function formatDateTime(
   ).format(date)
 }
 
+function formatCommandName(
+  command: string,
+): string {
+  return command
+    .toLowerCase()
+    .split('_')
+    .map(
+      (part) =>
+        part.charAt(0).toUpperCase() +
+        part.slice(1),
+    )
+    .join(' ')
+}
+
 export function DeviceDashboardPage() {
   const { deviceId } = useParams<{
     deviceId: string
@@ -136,6 +156,15 @@ export function DeviceDashboardPage() {
   const [error, setError] = useState<
     string | null
   >(null)
+
+  const [sendingCommand, setSendingCommand] =
+    useState<string | null>(null)
+
+  const [commandNotice, setCommandNotice] =
+    useState<string | null>(null)
+
+  const [commandError, setCommandError] =
+    useState<string | null>(null)
 
   const loadDevice = useCallback(
     async () => {
@@ -165,6 +194,43 @@ export function DeviceDashboardPage() {
         )
       } finally {
         setLoading(false)
+      }
+    },
+    [deviceId],
+  )
+
+  const sendCommand = useCallback(
+    async (
+      command: string,
+      payload: Record<string, unknown> = {},
+    ) => {
+      if (!deviceId) {
+        return
+      }
+
+      try {
+        setSendingCommand(command)
+        setCommandNotice(null)
+        setCommandError(null)
+
+        await createDeviceCommand(deviceId, {
+          command,
+          payload,
+        })
+
+        setCommandNotice(
+          `${formatCommandName(
+            command,
+          )} command queued successfully.`,
+        )
+      } catch (sendError) {
+        setCommandError(
+          sendError instanceof Error
+            ? sendError.message
+            : 'Unable to send the device command.',
+        )
+      } finally {
+        setSendingCommand(null)
       }
     },
     [deviceId],
@@ -246,8 +312,8 @@ export function DeviceDashboardPage() {
 
             <h1>
               {device.asset_id ||
-  device.hive_id ||
-  'Unnamed device'}
+                device.hive_id ||
+                'Unnamed device'}
             </h1>
 
             <div className="device-dashboard-subtitle">
@@ -266,16 +332,16 @@ export function DeviceDashboardPage() {
               </span>
 
               {device.hive_id ? (
-  <>
-    <span aria-hidden="true">
-      •
-    </span>
+                <>
+                  <span aria-hidden="true">
+                    •
+                  </span>
 
-    <code>
-      {device.hive_id}
-    </code>
-  </>
-) : null}
+                  <code>
+                    {device.hive_id}
+                  </code>
+                </>
+              ) : null}
             </div>
           </div>
         </div>
@@ -298,6 +364,169 @@ export function DeviceDashboardPage() {
           />
         </div>
       </header>
+
+      <section
+        aria-label="Device quick actions"
+        className="device-dashboard-actions"
+      >
+        <div className="device-dashboard-actions-heading">
+          <div>
+            <p className="eyebrow">
+              REMOTE MANAGEMENT
+            </p>
+
+            <h2>Quick actions</h2>
+          </div>
+
+          <span>
+            Commands are securely queued for the
+            Android agent.
+          </span>
+        </div>
+
+        <div className="device-dashboard-action-grid">
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() =>
+              void sendCommand('PING')
+            }
+            type="button"
+          >
+            <Radio
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand === 'PING'
+                  ? 'Queuing...'
+                  : 'Ping'}
+              </strong>
+
+              <small>
+                Test agent connectivity
+              </small>
+            </span>
+          </button>
+
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() =>
+              void sendCommand('RING')
+            }
+            type="button"
+          >
+            <Bell
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand === 'RING'
+                  ? 'Queuing...'
+                  : 'Ring device'}
+              </strong>
+
+              <small>
+                Play an audible alert
+              </small>
+            </span>
+          </button>
+
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() =>
+              void sendCommand(
+                'REQUEST_LOCATION',
+              )
+            }
+            type="button"
+          >
+            <MapPin
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand ===
+                'REQUEST_LOCATION'
+                  ? 'Queuing...'
+                  : 'Locate'}
+              </strong>
+
+              <small>
+                Request current location
+              </small>
+            </span>
+          </button>
+
+          <button
+            className="device-dashboard-action"
+            disabled
+            title="Message composer will be added next"
+            type="button"
+          >
+            <MessageSquare
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>Message</strong>
+
+              <small>
+                Display a device message
+              </small>
+            </span>
+          </button>
+
+          <button
+            className="device-dashboard-action"
+            disabled={loading}
+            onClick={() =>
+              void loadDevice()
+            }
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>Refresh</strong>
+
+              <small>
+                Reload device telemetry
+              </small>
+            </span>
+          </button>
+        </div>
+
+        {commandNotice && (
+          <p
+            className="device-dashboard-command-notice"
+            role="status"
+          >
+            {commandNotice}
+          </p>
+        )}
+
+        {commandError && (
+          <p
+            className="device-dashboard-command-error"
+            role="alert"
+          >
+            {commandError}
+          </p>
+        )}
+      </section>
 
       <section
         aria-label="Device summary"
@@ -471,17 +700,18 @@ export function DeviceDashboardPage() {
               </div>
 
               <div>
-                <div>
-  <dt>Hive ID</dt>
-  <dd>
-    <code>{device.hive_id}</code>
-  </dd>
-</div>
+                <dt>Hive ID</dt>
+                <dd>
+                  <code>{device.hive_id}</code>
+                </dd>
+              </div>
+
+              <div>
                 <dt>Asset ID</dt>
-<dd>
-  {device.asset_id ||
-    'Not assigned'}
-</dd>
+                <dd>
+                  {device.asset_id ||
+                    'Not assigned'}
+                </dd>
               </div>
 
               <div>
