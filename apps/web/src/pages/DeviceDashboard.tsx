@@ -148,6 +148,17 @@ function formatCommandName(
     .join(' ')
 }
 
+function getCommandActivityTime(
+  command: DeviceCommand,
+): string {
+  return (
+    command.completed_at ??
+    command.acknowledged_at ??
+    command.sent_at ??
+    command.created_at
+  )
+}
+
 export function DeviceDashboardPage() {
   const { deviceId } = useParams<{
     deviceId: string
@@ -228,6 +239,8 @@ const [locationError, setLocationError] =
       return
     }
 
+    const startedAt = Date.now()
+
     if (showLoader) {
       setCommandsLoading(true)
     }
@@ -245,7 +258,17 @@ const [locationError, setLocationError] =
           : 'Unable to load device activity.',
       )
     } finally {
-      setCommandsLoading(false)
+      if (showLoader) {
+        const elapsed = Date.now() - startedAt
+        const remaining = Math.max(
+          0,
+          500 - elapsed,
+        )
+
+        window.setTimeout(() => {
+          setCommandsLoading(false)
+        }, remaining)
+      }
     }
   },
   [deviceId],
@@ -884,6 +907,111 @@ useEffect(() => {
               </div>
             </dl>
           </section>
+          <main className="device-dashboard-main"></main>
+          <section className="device-dashboard-panel">
+  <div className="device-dashboard-panel-header">
+    <div>
+      <p className="eyebrow">
+        DEVICE ACTIVITY
+      </p>
+
+      <h2>Recent activity</h2>
+    </div>
+
+    <button
+      aria-label="Refresh device activity"
+      className="icon-button"
+      disabled={commandsLoading}
+      onClick={() =>
+        void loadCommands(true)
+      }
+      type="button"
+    >
+      <RefreshCw
+  aria-hidden="true"
+  size={17}
+  className={
+    commandsLoading ? "spin" : ""
+  }
+/>
+      
+    </button>
+  </div>
+
+  {commandsLoading && commands.length === 0 ? (
+    <div className="device-dashboard-empty">
+      <p>Loading device activity...</p>
+    </div>
+  ) : commandsError ? (
+    <p
+      className="device-dashboard-command-error"
+      role="alert"
+    >
+      {commandsError}
+    </p>
+  ) : commands.length === 0 ? (
+    <div className="device-dashboard-empty">
+      <p>
+        No command activity has been recorded
+        for this device.
+      </p>
+    </div>
+  ) : (
+    <ol className="device-activity-timeline">
+      {commands.slice(0, 12).map(
+        (command) => {
+          const activityTime =
+            getCommandActivityTime(command)
+
+          return (
+            <li
+              className="device-activity-item"
+              key={command.id}
+            >
+              <span
+                aria-hidden="true"
+                className={`device-activity-marker device-activity-marker-${command.status.toLowerCase()}`}
+              />
+
+              <div className="device-activity-content">
+                <div className="device-activity-heading">
+                  <strong>
+                    {formatCommandName(
+                      command.command,
+                    )}
+                  </strong>
+
+                  <span
+                    className={`device-activity-status device-activity-status-${command.status.toLowerCase()}`}
+                  >
+                    {formatCommandName(
+                      command.status,
+                    )}
+                  </span>
+                </div>
+
+                <p>
+                  {command.result_message ??
+                    'Command submitted to the Android agent.'}
+                </p>
+
+                <time dateTime={activityTime}>
+                  {formatRelativeTime(
+                    activityTime,
+                  )}
+                  {' · '}
+                  {formatDateTime(
+                    activityTime,
+                  )}
+                </time>
+              </div>
+            </li>
+          )
+        },
+      )}
+    </ol>
+  )}
+</section>
         </main>
 
         <aside className="device-dashboard-side">
@@ -973,10 +1101,13 @@ useEffect(() => {
     }
     type="button"
   >
-    <RefreshCw
-      aria-hidden="true"
-      size={16}
-    />
+<RefreshCw
+  aria-hidden="true"
+  size={18}
+  className={
+    locationLoading ? "spin" : ""
+  }
+/>
   </button>
 
   {locationLoading ? (
