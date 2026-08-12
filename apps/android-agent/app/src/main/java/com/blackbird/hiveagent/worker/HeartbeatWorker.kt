@@ -115,10 +115,10 @@ class HeartbeatWorker(
                     )
 
                     val commandResult =
-    commandProcessor.execute(
-        command = command,
-        deviceToken = deviceToken,
-    )
+                         commandProcessor.execute(
+                         command = command,
+                        deviceToken = deviceToken,
+                            )
 
                     if (commandResult.successful) {
                         apiClient.completeCommand(

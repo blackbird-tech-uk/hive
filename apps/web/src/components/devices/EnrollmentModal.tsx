@@ -15,6 +15,7 @@ import {
   createEnrollmentToken,
   type EnrollmentTokenCreatedResponse,
 } from '../../lib/api'
+
 interface EnrollmentModalProps {
   isOpen: boolean
   onClose: () => void

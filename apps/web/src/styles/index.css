@@ -3354,3 +3354,84 @@ body {
   align-items: center;
   gap: 10px;
 }
+/* Device notification command */
+
+.device-notification-action {
+  display: grid;
+  gap: 14px;
+  grid-column: 1 / -1;
+  padding: 18px;
+  border: 1px solid #2d2d32;
+  border-radius: 13px;
+  background: #19191c;
+}
+
+.device-notification-action-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.device-notification-action-heading > svg {
+  flex: 0 0 auto;
+  color: #facc15;
+}
+
+.device-notification-action-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.device-notification-action-heading strong {
+  color: #f4f4f5;
+  font-size: 0.85rem;
+}
+
+.device-notification-action-heading small {
+  color: #85858f;
+  font-size: 0.7rem;
+}
+
+.device-notification-action label {
+  display: grid;
+  gap: 7px;
+}
+
+.device-notification-action label > span {
+  color: #a1a1aa;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.device-notification-action input,
+.device-notification-action textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #303036;
+  border-radius: 9px;
+  background: #141416;
+  color: #f4f4f5;
+  font: inherit;
+}
+
+.device-notification-action textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.device-notification-action input:focus,
+.device-notification-action textarea:focus {
+  border-color: #facc15;
+  outline: 2px solid rgba(250, 204, 21, 0.14);
+  outline-offset: 1px;
+}
+
+.device-notification-action input:disabled,
+.device-notification-action textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.device-notification-action .primary-button {
+  justify-self: start;
+}

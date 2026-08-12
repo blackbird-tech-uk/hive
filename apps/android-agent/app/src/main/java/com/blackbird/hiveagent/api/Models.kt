@@ -8,6 +8,7 @@ data class DeviceHeartbeatRequest(
     val agentVersion: String?,
     val androidVersion: String?,
     val buildVersion: String?,
+    val imei: String?,
 )
 
 data class DeviceCommand(
