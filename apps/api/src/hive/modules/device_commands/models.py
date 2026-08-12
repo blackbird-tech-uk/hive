@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import enum
 import uuid
@@ -20,6 +20,9 @@ class DeviceCommandType(str, enum.Enum):
     PING = "PING"
     RING = "RING"
     REFRESH_APPS = "REFRESH_APPS"
+    LAUNCH_APP = "LAUNCH_APP"
+    FORCE_STOP_APP = "FORCE_STOP_APP"
+    UNINSTALL_APP = "UNINSTALL_APP"
     SHOW_MESSAGE = "SHOW_MESSAGE"
     REQUEST_LOCATION = "REQUEST_LOCATION"
 

@@ -3,11 +3,13 @@
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.Looper
@@ -56,6 +58,9 @@ class CommandProcessor(
             "SHOW_MESSAGE" -> executeShowMessage(command)
 
             "REFRESH_APPS" -> executeRefreshApps(deviceToken)
+            "LAUNCH_APP" -> executeLaunchApp(command)
+            "FORCE_STOP_APP" -> executeForceStopApp(command)
+            "UNINSTALL_APP" -> executeUninstallApp(command)
             "REQUEST_LOCATION" -> executeRequestLocation(
                 deviceToken = deviceToken,
             )
@@ -401,6 +406,135 @@ class CommandProcessor(
         }
     }
 
+    private fun commandPackageName(
+        command: DeviceCommand,
+    ): String? =
+        command.payload["package_name"]
+            ?.toString()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+
+    private fun executeLaunchApp(
+        command: DeviceCommand,
+    ): CommandExecutionResult {
+        val packageName =
+            commandPackageName(command)
+                ?: return failure(
+                    "LAUNCH_APP payload did not contain package_name.",
+                )
+
+        return try {
+            val launchIntent =
+                context.packageManager
+                    .getLaunchIntentForPackage(packageName)
+                    ?: return failure(
+                        "No launchable activity was found for $packageName.",
+                    )
+
+            launchIntent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK,
+            )
+            context.startActivity(launchIntent)
+
+            success(
+                "Launch request sent for $packageName.",
+            )
+        } catch (exception: Exception) {
+            failure(
+                exception.message
+                    ?: "Unable to launch $packageName.",
+            )
+        }
+    }
+
+    private fun executeForceStopApp(
+        command: DeviceCommand,
+    ): CommandExecutionResult {
+        val packageName =
+            commandPackageName(command)
+                ?: return failure(
+                    "FORCE_STOP_APP payload did not contain package_name.",
+                )
+
+        if (packageName == context.packageName) {
+            return failure(
+                "Hive Agent cannot force stop itself.",
+            )
+        }
+
+        return failure(
+            "Force stop is unavailable to a standard Android app. " +
+                "It requires privileged system/OEM management. " +
+                "No action was taken for $packageName.",
+        )
+    }
+
+    private fun executeUninstallApp(
+        command: DeviceCommand,
+    ): CommandExecutionResult {
+        val packageName =
+            commandPackageName(command)
+                ?: return failure(
+                    "UNINSTALL_APP payload did not contain package_name.",
+                )
+
+        if (packageName == context.packageName) {
+            return failure(
+                "Hive Agent cannot uninstall itself remotely.",
+            )
+        }
+
+        return try {
+            @Suppress("DEPRECATION")
+            val packageInfo =
+                context.packageManager.getPackageInfo(
+                    packageName,
+                    0,
+                )
+
+            val applicationInfo =
+                packageInfo.applicationInfo
+
+            val isSystemApp =
+                applicationInfo != null &&
+                    (
+                        applicationInfo.flags and
+                            android.content.pm.ApplicationInfo.FLAG_SYSTEM
+                    ) != 0
+
+            if (isSystemApp) {
+                return failure(
+                    "System applications cannot be uninstalled by Hive Agent.",
+                )
+            }
+
+            val uninstallIntent =
+                Intent(
+                    Intent.ACTION_DELETE,
+                    Uri.parse("package:$packageName"),
+                ).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+
+            context.startActivity(uninstallIntent)
+
+            success(
+                "Android uninstall confirmation opened for $packageName. " +
+                    "User confirmation is required on this non-device-owner device.",
+            )
+        } catch (
+            exception: PackageManager.NameNotFoundException
+        ) {
+            failure(
+                "Package $packageName is no longer installed.",
+            )
+        } catch (exception: Exception) {
+            failure(
+                exception.message
+                    ?: "Unable to request uninstall for $packageName.",
+            )
+        }
+    }
     private suspend fun executeRefreshApps(
         deviceToken: String,
     ): CommandExecutionResult {
@@ -506,4 +640,5 @@ class CommandProcessor(
         message = message,
     )
 }
+
 

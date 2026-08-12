@@ -21,6 +21,7 @@ import {
   useParams,
 } from 'react-router-dom'
 
+import { ApplicationInventoryPanel } from '../components/devices/ApplicationInventoryPanel'
 import { StatusBadge } from '../components/devices/StatusBadge'
 import {
   createDeviceCommand,
@@ -461,6 +462,27 @@ const loadLocation = useCallback(
       window.setTimeout(() => {
         void loadApplications()
       }, 8_000)
+    },
+    [loadApplications, sendCommand],
+  )
+  const handleApplicationCommand = useCallback(
+    async (
+      command:
+        | 'LAUNCH_APP'
+        | 'FORCE_STOP_APP'
+        | 'UNINSTALL_APP',
+      application: InstalledApplication,
+    ) => {
+      await sendCommand(command, {
+        package_name: application.package_name,
+        app_name: application.app_name,
+      })
+
+      if (command === 'UNINSTALL_APP') {
+        window.setTimeout(() => {
+          void loadApplications()
+        }, 12_000)
+      }
     },
     [loadApplications, sendCommand],
   )
@@ -1364,135 +1386,17 @@ useEffect(() => {
       )}
 
       {activeTab === 'applications' && (
-        <section className="device-dashboard-panel">
-          <div className="device-dashboard-panel-header">
-            <div>
-              <p className="eyebrow">
-                APPLICATION INVENTORY
-              </p>
-
-              <h2>
-                Installed applications
-              </h2>
-            </div>
-
-            <button
-              aria-label="Refresh installed applications"
-              className="icon-button"
-              disabled={applicationsLoading}
-              onClick={() =>
-                void loadApplications(true)
-              }
-              type="button"
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={
-                  applicationsLoading
-                    ? 'spin'
-                    : ''
-                }
-                size={17}
-              />
-            </button>
-          </div>
-
-          <div className="device-applications-summary">
-            <strong>
-              {applications.length}
-            </strong>
-
-            <span>
-              applications reported
-            </span>
-          </div>
-
-          {applicationsLoading &&
-          applications.length === 0 ? (
-            <div className="device-dashboard-empty">
-              <p>
-                Loading installed applications...
-              </p>
-            </div>
-          ) : applicationsError ? (
-            <p
-              className="device-dashboard-command-error"
-              role="alert"
-            >
-              {applicationsError}
-            </p>
-          ) : applications.length === 0 ? (
-            <div className="device-dashboard-empty">
-              <p>
-                No application inventory has been reported yet.
-              </p>
-
-              <p>
-                Use Refresh Apps to request an inventory from the device.
-              </p>
-            </div>
-          ) : (
-            <div className="device-applications-table-wrapper">
-              <table className="device-applications-table">
-                <thead>
-                  <tr>
-                    <th>Application</th>
-                    <th>Package</th>
-                    <th>Version</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {applications.map(
-                    (application) => (
-                      <tr key={application.id}>
-                        <td>
-                          <strong>
-                            {application.app_name ??
-                              application.package_name}
-                          </strong>
-                        </td>
-
-                        <td>
-                          <code>
-                            {application.package_name}
-                          </code>
-                        </td>
-
-                        <td>
-                          {application.version_name ??
-                            'Not reported'}
-                        </td>
-
-                        <td>
-                          <span
-                            className={`device-app-type ${
-                              application.is_system_app
-                                ? 'device-app-type-system'
-                                : 'device-app-type-user'
-                            }`}
-                          >
-                            {application.is_system_app
-                              ? 'System'
-                              : 'User'}
-                          </span>
-                        </td>
-
-                        <td>
-                          {application.is_enabled
-                            ? 'Enabled'
-                            : 'Disabled'}
-                        </td>
-                      </tr>
-                    ),
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <ApplicationInventoryPanel
+          applications={applications}
+          error={applicationsError}
+          loading={applicationsLoading}
+          onCommand={handleApplicationCommand}
+          onRefreshInventory={handleRefreshApps}
+          onReload={() =>
+            void loadApplications(true)
+          }
+          sendingCommand={sendingCommand}
+        />
       )}
 
       {activeTab === 'activity' && (
@@ -1604,4 +1508,5 @@ useEffect(() => {
     </section>
   )
 }
+
 

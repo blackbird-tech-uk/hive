@@ -3520,3 +3520,110 @@ body {
   background: rgba(113, 113, 122, 0.17);
   color: #d4d4d8;
 }
+
+/* Sprint 03 - app management */
+
+.device-applications-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
+.device-app-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 11px;
+  border: 1px solid #303036;
+  border-radius: 10px;
+  background: #141416;
+  color: #74747f;
+}
+
+.device-app-search:focus-within {
+  border-color: #facc15;
+  outline: 2px solid rgba(250, 204, 21, 0.12);
+}
+
+.device-app-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f4f4f5;
+  font: inherit;
+}
+
+.device-app-filter {
+  padding: 0 12px;
+  border: 1px solid #303036;
+  border-radius: 10px;
+  background: #141416;
+  color: #f4f4f5;
+  font: inherit;
+}
+
+.device-app-management-note {
+  margin: 0 0 15px;
+  color: #7f7f8a;
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+.device-applications-management-table {
+  min-width: 1180px;
+}
+
+.device-app-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.device-app-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid #34343a;
+  border-radius: 8px;
+  background: #19191c;
+  color: #d4d4d8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.device-app-action:hover:not(:disabled) {
+  border-color: #52525b;
+  background: #222226;
+  color: #ffffff;
+}
+
+.device-app-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.device-app-action-danger {
+  border-color: rgba(239, 68, 68, 0.28);
+  color: #fca5a5;
+}
+
+@media (max-width: 860px) {
+  .device-applications-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .device-app-filter,
+  .device-applications-toolbar .secondary-button {
+    min-height: 42px;
+  }
+}
