@@ -68,6 +68,8 @@ export interface Device {
   is_device_admin: boolean
   is_device_owner: boolean
   supports_lock_task: boolean
+  supports_device_lock: boolean
+  is_lock_task_active: boolean
   battery_level: number | null
   is_charging: boolean | null
 
@@ -258,6 +260,7 @@ export interface EnrollmentTokenResponse {
 export interface ApiErrorBody {
   detail?: string
 }
+
 
 
 

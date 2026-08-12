@@ -805,6 +805,42 @@ useEffect(() => {
             </span>
           </button>
 
+
+          <button
+            className="device-dashboard-action"
+            disabled={
+              sendingCommand !== null ||
+              !device.supports_device_lock
+            }
+            onClick={() =>
+              void sendCommand('LOCK_DEVICE')
+            }
+            title={
+              device.supports_device_lock
+                ? 'Lock this managed device'
+                : 'Requires active Device Admin or Device Owner'
+            }
+            type="button"
+          >
+            <Smartphone
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand === 'LOCK_DEVICE'
+                  ? 'Queuing...'
+                  : 'Lock device'}
+              </strong>
+
+              <small>
+                {device.supports_device_lock
+                  ? 'Immediately lock the screen'
+                  : 'Requires Device Admin'}
+              </small>
+            </span>
+          </button>
           <button
             className="device-dashboard-action"
             disabled={loading}
@@ -1211,6 +1247,23 @@ useEffect(() => {
                     : 'Unavailable'}
                 </strong>
               </article>
+              <article>
+                <span>Device lock</span>
+                <strong>
+                  {device.supports_device_lock
+                    ? 'Ready'
+                    : 'Unavailable'}
+                </strong>
+              </article>
+
+              <article>
+                <span>Kiosk state</span>
+                <strong>
+                  {device.is_lock_task_active
+                    ? 'Active'
+                    : 'Inactive'}
+                </strong>
+              </article>
             </div>
 
             {!device.is_device_owner && (
@@ -1222,6 +1275,45 @@ useEffect(() => {
             )}
           </section>
 
+
+          <section className="device-policy-status">
+            <div>
+              <p className="eyebrow">
+                POLICY STATUS
+              </p>
+              <h2>Control readiness</h2>
+            </div>
+
+            <div className="device-policy-status-grid">
+              <div>
+                <span>Remote lock</span>
+                <strong>
+                  {device.supports_device_lock
+                    ? 'Available'
+                    : 'Blocked'}
+                </strong>
+                <small>
+                  {device.supports_device_lock
+                    ? 'Hive can request an immediate device lock.'
+                    : 'Enable Device Admin or provision Device Owner.'}
+                </small>
+              </div>
+
+              <div>
+                <span>Kiosk / lock task</span>
+                <strong>
+                  {device.supports_lock_task
+                    ? 'Ready'
+                    : 'Requires Device Owner'}
+                </strong>
+                <small>
+                  {device.is_lock_task_active
+                    ? 'Lock task mode is currently active.'
+                    : 'Lock task mode is currently inactive.'}
+                </small>
+              </div>
+            </div>
+          </section>
           <section className="device-dashboard-panel">
             <div className="device-dashboard-panel-header">
               <div>
@@ -1595,6 +1687,7 @@ useEffect(() => {
     </section>
   )
 }
+
 
 
 

@@ -32,6 +32,8 @@ class HiveApiClient(
             putNullable("is_device_admin", payload.isDeviceAdmin)
             putNullable("is_device_owner", payload.isDeviceOwner)
             putNullable("supports_lock_task", payload.supportsLockTask)
+            putNullable("supports_device_lock", payload.supportsDeviceLock)
+            putNullable("is_lock_task_active", payload.isLockTaskActive)
         }
 
         return parseHeartbeatResponse(
@@ -371,4 +373,5 @@ class HiveApiClient(
         return optNullableDouble(key)?.toFloat()
     }
 }
+
 

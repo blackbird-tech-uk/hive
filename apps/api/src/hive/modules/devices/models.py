@@ -179,6 +179,17 @@ class Device(Base):
         default=False,
     )
 
+    supports_device_lock: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    is_lock_task_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
     battery_level: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
@@ -271,6 +282,7 @@ class Device(Base):
         passive_deletes=True,
         order_by=lambda: DeviceLocation.recorded_at.desc(),
     )
+
 
 
 

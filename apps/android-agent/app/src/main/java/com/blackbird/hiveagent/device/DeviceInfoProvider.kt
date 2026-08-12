@@ -1,6 +1,7 @@
 ﻿package com.blackbird.hiveagent.device
 
 import android.Manifest
+import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -56,6 +57,18 @@ class DeviceInfoProvider(
         val supportsLockTask =
             isDeviceOwner
 
+        val supportsDeviceLock =
+            isDeviceOwner || isDeviceAdmin
+
+        val activityManager =
+            applicationContext.getSystemService(
+                Context.ACTIVITY_SERVICE,
+            ) as ActivityManager
+
+        val isLockTaskActive =
+            activityManager.lockTaskModeState !=
+                ActivityManager.LOCK_TASK_MODE_NONE
+
         return DeviceHeartbeatRequest(
             batteryLevel =
                 telemetry.batteryLevel,
@@ -81,6 +94,10 @@ class DeviceInfoProvider(
                 isDeviceOwner,
             supportsLockTask =
                 supportsLockTask,
+            supportsDeviceLock =
+                supportsDeviceLock,
+            isLockTaskActive =
+                isLockTaskActive,
         )
     }
 
@@ -125,6 +142,8 @@ class DeviceInfoProvider(
         }
     }
 }
+
+
 
 
 

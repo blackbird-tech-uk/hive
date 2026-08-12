@@ -1,7 +1,9 @@
 ﻿package com.blackbird.hiveagent.commands
 
 import android.Manifest
+import android.app.admin.DevicePolicyManager
 import android.annotation.SuppressLint
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,6 +19,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.content.ContextCompat
+import com.blackbird.hiveagent.HiveDeviceAdminReceiver
 import com.blackbird.hiveagent.api.CommandExecutionResult
 import com.blackbird.hiveagent.api.DeviceCommand
 import com.blackbird.hiveagent.api.DeviceLocationUpload
@@ -39,6 +42,17 @@ class CommandProcessor(
         context.getSystemService(
             Context.LOCATION_SERVICE,
         ) as LocationManager
+
+    private val devicePolicyManager =
+        context.getSystemService(
+            Context.DEVICE_POLICY_SERVICE,
+        ) as DevicePolicyManager
+
+    private val adminComponent =
+        ComponentName(
+            context,
+            HiveDeviceAdminReceiver::class.java,
+        )
 
     suspend fun execute(
         command: DeviceCommand,
@@ -65,10 +79,7 @@ class CommandProcessor(
                 deviceToken = deviceToken,
             )
 
-            "LOCK_DEVICE" -> failure(
-                "LOCK_DEVICE requires Android device-owner " +
-                    "or device-admin provisioning.",
-            )
+            "LOCK_DEVICE" -> executeLockDevice()
 
             else -> failure(
                 "Unsupported command: ${command.command}",
@@ -76,6 +87,42 @@ class CommandProcessor(
         }
     }
 
+
+    private fun executeLockDevice(): CommandExecutionResult {
+        val isDeviceOwner =
+            devicePolicyManager.isDeviceOwnerApp(
+                context.packageName,
+            )
+
+        val isDeviceAdmin =
+            devicePolicyManager.isAdminActive(
+                adminComponent,
+            )
+
+        if (!isDeviceOwner && !isDeviceAdmin) {
+            return failure(
+                "LOCK_DEVICE requires active Device Admin or Device Owner capability.",
+            )
+        }
+
+        return try {
+            devicePolicyManager.lockNow()
+
+            success(
+                "Device lock requested successfully.",
+            )
+        } catch (exception: SecurityException) {
+            failure(
+                exception.message
+                    ?: "Android rejected the device lock request.",
+            )
+        } catch (exception: Exception) {
+            failure(
+                exception.message
+                    ?: "Unable to lock the device.",
+            )
+        }
+    }
     private suspend fun executeRequestLocation(
         deviceToken: String,
     ): CommandExecutionResult {
@@ -640,5 +687,7 @@ class CommandProcessor(
         message = message,
     )
 }
+
+
 
 

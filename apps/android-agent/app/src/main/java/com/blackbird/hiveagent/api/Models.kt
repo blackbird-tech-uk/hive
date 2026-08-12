@@ -13,6 +13,8 @@ data class DeviceHeartbeatRequest(
     val isDeviceAdmin: Boolean?,
     val isDeviceOwner: Boolean?,
     val supportsLockTask: Boolean?,
+    val supportsDeviceLock: Boolean?,
+    val isLockTaskActive: Boolean?,
 )
 
 data class DeviceCommand(
@@ -76,6 +78,7 @@ data class InstalledApplicationInventoryResponse(
     val applicationCount: Int,
     val reportedAt: String,
 )
+
 
 
 

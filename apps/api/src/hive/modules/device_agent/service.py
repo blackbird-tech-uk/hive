@@ -123,6 +123,11 @@ class DeviceAgentService:
 
         if payload.supports_lock_task is not None:
             device.supports_lock_task = payload.supports_lock_task
+        if payload.supports_device_lock is not None:
+            device.supports_device_lock = payload.supports_device_lock
+
+        if payload.is_lock_task_active is not None:
+            device.is_lock_task_active = payload.is_lock_task_active
         delivered_commands: list[
             DeviceCommandDelivery
         ] = []
@@ -236,6 +241,7 @@ class DeviceAgentService:
         cleaned = value.strip()
 
         return cleaned or None
+
 
 
 

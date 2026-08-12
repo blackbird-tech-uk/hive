@@ -3682,3 +3682,65 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* Sprint 05 - policy and kiosk readiness */
+
+.device-policy-status {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid #2d2d32;
+  border-radius: 14px;
+  background: #121214;
+}
+
+.device-policy-status h2 {
+  margin: 5px 0 0;
+}
+
+.device-policy-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.device-policy-status-grid > div {
+  padding: 14px;
+  border: 1px solid #2a2a2f;
+  border-radius: 10px;
+  background: #18181b;
+}
+
+.device-policy-status-grid span,
+.device-policy-status-grid small {
+  display: block;
+}
+
+.device-policy-status-grid span {
+  color: #7f7f8a;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.device-policy-status-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.86rem;
+}
+
+.device-policy-status-grid small {
+  margin-top: 5px;
+  color: #8b8b95;
+  line-height: 1.5;
+}
+
+.device-dashboard-action:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .device-policy-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
