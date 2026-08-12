@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import enum
 import uuid
@@ -46,6 +46,12 @@ class DeviceCondition(str, enum.Enum):
     FAIR = "fair"
     POOR = "poor"
 
+
+
+class DeviceManagementMode(str, enum.Enum):
+    STANDARD = "standard"
+    DEVICE_ADMIN = "device_admin"
+    DEVICE_OWNER = "device_owner"
 
 class Device(Base):
     """A physical device managed by Hive."""
@@ -142,6 +148,37 @@ class Device(Base):
         nullable=True,
     )
 
+    management_mode: Mapped[DeviceManagementMode] = mapped_column(
+        Enum(
+            DeviceManagementMode,
+            name="device_management_mode",
+            values_callable=lambda enum_class: [
+                member.value
+                for member in enum_class
+            ],
+        ),
+        nullable=False,
+        default=DeviceManagementMode.STANDARD,
+    )
+
+    is_device_admin: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    is_device_owner: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    supports_lock_task: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
     battery_level: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
@@ -234,3 +271,14 @@ class Device(Base):
         passive_deletes=True,
         order_by=lambda: DeviceLocation.recorded_at.desc(),
     )
+
+
+
+
+
+
+
+
+
+
+

@@ -1,11 +1,15 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from hive.modules.devices.models import DeviceCondition, DeviceStatus
+from hive.modules.devices.models import (
+    DeviceCondition,
+    DeviceManagementMode,
+    DeviceStatus,
+)
 
 
 class DeviceCreate(BaseModel):
@@ -45,6 +49,10 @@ class DeviceResponse(BaseModel):
     android_version: str | None
     build_version: str | None
     agent_version: str | None
+    management_mode: DeviceManagementMode
+    is_device_admin: bool
+    is_device_owner: bool
+    supports_lock_task: bool
     battery_level: int | None
     is_charging: bool | None
     wifi_ssid: str | None
@@ -66,3 +74,13 @@ class DeviceTokenResponse(BaseModel):
     token_type: str = "Bearer"
     expires_in: int
     token_version: int
+
+
+
+
+
+
+
+
+
+

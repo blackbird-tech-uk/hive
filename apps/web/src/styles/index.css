@@ -3627,3 +3627,58 @@ body {
     min-height: 42px;
   }
 }
+
+/* Sprint 04 - enterprise capability foundation */
+
+.device-management-summary-card strong {
+  text-transform: none;
+}
+
+.device-enterprise-readiness {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid #2d2d32;
+  border-radius: 14px;
+  background: #121214;
+}
+
+.device-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.device-capability-grid article {
+  padding: 13px;
+  border: 1px solid #2a2a2f;
+  border-radius: 10px;
+  background: #18181b;
+}
+
+.device-capability-grid span {
+  display: block;
+  margin-bottom: 6px;
+  color: #7f7f8a;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.device-capability-grid strong {
+  color: #f4f4f5;
+  font-size: 0.84rem;
+}
+
+.device-enterprise-note {
+  margin: 14px 0 0;
+  color: #8b8b95;
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .device-capability-grid {
+    grid-template-columns: 1fr;
+  }
+}

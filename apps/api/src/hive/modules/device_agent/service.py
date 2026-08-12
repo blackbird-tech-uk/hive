@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import UTC, datetime
 
@@ -112,6 +112,17 @@ class DeviceAgentService:
                 )
             )
 
+        if payload.management_mode is not None:
+            device.management_mode = payload.management_mode
+
+        if payload.is_device_admin is not None:
+            device.is_device_admin = payload.is_device_admin
+
+        if payload.is_device_owner is not None:
+            device.is_device_owner = payload.is_device_owner
+
+        if payload.supports_lock_task is not None:
+            device.supports_lock_task = payload.supports_lock_task
         delivered_commands: list[
             DeviceCommandDelivery
         ] = []
@@ -225,3 +236,8 @@ class DeviceAgentService:
         cleaned = value.strip()
 
         return cleaned or None
+
+
+
+
+

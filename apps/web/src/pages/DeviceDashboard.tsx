@@ -61,6 +61,19 @@ function isDeviceOnline(
   )
 }
 
+function formatManagementMode(
+  mode: string | null | undefined,
+): string {
+  switch (mode) {
+    case 'device_owner':
+      return 'Device Owner'
+    case 'device_admin':
+      return 'Device Admin'
+    default:
+      return 'Standard'
+  }
+}
+
 function formatRelativeTime(
   value: string | null | undefined,
 ): string {
@@ -987,6 +1000,33 @@ useEffect(() => {
             </small>
           </div>
         </article>
+        <article className="device-dashboard-summary-card device-management-summary-card">
+          <span className="device-dashboard-summary-icon">
+            <Smartphone
+              aria-hidden="true"
+              size={21}
+            />
+          </span>
+
+          <div>
+            <span>Management mode</span>
+
+            <strong>
+              {formatManagementMode(
+                device.management_mode,
+              )}
+            </strong>
+
+            <small>
+              {device.is_device_owner
+                ? 'Enterprise Device Owner capabilities available'
+                : device.is_device_admin
+                  ? 'Device Admin active; enterprise controls limited'
+                  : 'Standard app management; advanced controls unavailable'}
+            </small>
+          </div>
+        </article>
+
 
         <article className="device-dashboard-summary-card">
           <span className="device-dashboard-summary-icon">
@@ -1135,6 +1175,53 @@ useEffect(() => {
       {activeTab === 'overview' && (
         <div className="device-dashboard-layout">
           <main className="device-dashboard-main">
+          <section className="device-enterprise-readiness">
+            <div>
+              <p className="eyebrow">
+                ENTERPRISE READINESS
+              </p>
+
+              <h2>Management capabilities</h2>
+            </div>
+
+            <div className="device-capability-grid">
+              <article>
+                <span>Device Admin</span>
+                <strong>
+                  {device.is_device_admin
+                    ? 'Available'
+                    : 'Not active'}
+                </strong>
+              </article>
+
+              <article>
+                <span>Device Owner</span>
+                <strong>
+                  {device.is_device_owner
+                    ? 'Available'
+                    : 'Not provisioned'}
+                </strong>
+              </article>
+
+              <article>
+                <span>Lock task / kiosk</span>
+                <strong>
+                  {device.supports_lock_task
+                    ? 'Supported'
+                    : 'Unavailable'}
+                </strong>
+              </article>
+            </div>
+
+            {!device.is_device_owner && (
+              <p className="device-enterprise-note">
+                Advanced enterprise actions remain disabled until a future
+                test device is provisioned as Device Owner. This device
+                remains fully usable in its current setup.
+              </p>
+            )}
+          </section>
+
           <section className="device-dashboard-panel">
             <div className="device-dashboard-panel-header">
               <div>
@@ -1508,5 +1595,8 @@ useEffect(() => {
     </section>
   )
 }
+
+
+
 
 

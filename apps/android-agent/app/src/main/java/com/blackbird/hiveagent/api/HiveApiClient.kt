@@ -28,6 +28,10 @@ class HiveApiClient(
             putNullable("agent_version", payload.agentVersion)
             putNullable("android_version", payload.androidVersion)
             putNullable("build_version", payload.buildVersion)
+            putNullable("management_mode", payload.managementMode)
+            putNullable("is_device_admin", payload.isDeviceAdmin)
+            putNullable("is_device_owner", payload.isDeviceOwner)
+            putNullable("supports_lock_task", payload.supportsLockTask)
         }
 
         return parseHeartbeatResponse(
@@ -367,3 +371,4 @@ class HiveApiClient(
         return optNullableDouble(key)?.toFloat()
     }
 }
+

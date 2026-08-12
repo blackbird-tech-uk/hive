@@ -9,6 +9,10 @@ data class DeviceHeartbeatRequest(
     val androidVersion: String?,
     val buildVersion: String?,
     val imei: String?,
+    val managementMode: String?,
+    val isDeviceAdmin: Boolean?,
+    val isDeviceOwner: Boolean?,
+    val supportsLockTask: Boolean?,
 )
 
 data class DeviceCommand(
@@ -72,3 +76,8 @@ data class InstalledApplicationInventoryResponse(
     val applicationCount: Int,
     val reportedAt: String,
 )
+
+
+
+
+

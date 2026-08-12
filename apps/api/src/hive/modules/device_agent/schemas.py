@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
@@ -25,6 +25,10 @@ class DeviceAgentResponse(BaseModel):
     is_charging: bool | None = None
     wifi_ssid: str | None = None
     ip_address: str | None = None
+    management_mode: str | None = None
+    is_device_admin: bool | None = None
+    is_device_owner: bool | None = None
+    supports_lock_task: bool | None = None
     enrolled_at: datetime | None = None
     last_seen_at: datetime | None = None
 
@@ -75,6 +79,15 @@ class DeviceHeartbeatRequest(BaseModel):
         default=None,
         max_length=100,
     )
+
+    management_mode: str | None = Field(
+        default=None,
+        max_length=32,
+    )
+
+    is_device_admin: bool | None = None
+    is_device_owner: bool | None = None
+    supports_lock_task: bool | None = None
 
 
 class DeviceCommandDelivery(BaseModel):
@@ -162,3 +175,9 @@ class DeviceLocationResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+
+
+
+

@@ -60,6 +60,14 @@ export interface Device {
   build_version: string | null
   agent_version: string | null
 
+    management_mode:
+    | 'standard'
+    | 'device_admin'
+    | 'device_owner'
+    | string
+  is_device_admin: boolean
+  is_device_owner: boolean
+  supports_lock_task: boolean
   battery_level: number | null
   is_charging: boolean | null
 
@@ -250,3 +258,6 @@ export interface EnrollmentTokenResponse {
 export interface ApiErrorBody {
   detail?: string
 }
+
+
+
