@@ -63,6 +63,51 @@ class HiveApiClient(
         )
     }
 
+    suspend fun uploadInstalledApplications(
+        deviceToken: String,
+        applications: List<InstalledApplicationUpload>,
+    ): InstalledApplicationInventoryResponse {
+        val applicationsJson = JSONArray()
+
+        applications.forEach { application ->
+            applicationsJson.put(
+                JSONObject().apply {
+                    put("package_name", application.packageName)
+                    putNullable("app_name", application.appName)
+                    putNullable("version_name", application.versionName)
+                    putNullable("version_code", application.versionCode)
+                    put("is_system_app", application.isSystemApp)
+                    put("is_enabled", application.isEnabled)
+                    putNullable(
+                        "first_installed_at",
+                        application.firstInstalledAt,
+                    )
+                    putNullable(
+                        "last_updated_at",
+                        application.lastUpdatedAt,
+                    )
+                },
+            )
+        }
+
+        val response = post(
+            path = "/device-agent/apps",
+            token = deviceToken,
+            body = JSONObject().put(
+                "applications",
+                applicationsJson,
+            ),
+        )
+
+        return InstalledApplicationInventoryResponse(
+            deviceId = response.getString("device_id"),
+            applicationCount =
+                response.getInt("application_count"),
+            reportedAt =
+                response.getString("reported_at"),
+        )
+    }
+
     suspend fun acknowledgeCommand(
         deviceToken: String,
         commandId: String,

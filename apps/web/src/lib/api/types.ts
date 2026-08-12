@@ -78,6 +78,25 @@ export interface Device {
   updated_at: string
 }
 
+/* ---------- Installed Applications ---------- */
+
+export interface InstalledApplication {
+  id: string
+  organization_id: string
+  device_id: string
+  package_name: string
+  app_name: string | null
+  version_name: string | null
+  version_code: number | null
+  is_system_app: boolean
+  is_enabled: boolean
+  first_installed_at: string | null
+  last_updated_at: string | null
+  reported_at: string
+  created_at: string
+  updated_at: string
+}
+
 /* ---------- Device Locations ---------- */
 
 export interface DeviceLocation {

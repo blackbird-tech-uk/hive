@@ -56,3 +56,19 @@ data class CommandExecutionResult(
     val successful: Boolean,
     val message: String,
 )
+data class InstalledApplicationUpload(
+    val packageName: String,
+    val appName: String?,
+    val versionName: String?,
+    val versionCode: Long?,
+    val isSystemApp: Boolean,
+    val isEnabled: Boolean,
+    val firstInstalledAt: String?,
+    val lastUpdatedAt: String?,
+)
+
+data class InstalledApplicationInventoryResponse(
+    val deviceId: String,
+    val applicationCount: Int,
+    val reportedAt: String,
+)

@@ -19,6 +19,7 @@ import com.blackbird.hiveagent.api.CommandExecutionResult
 import com.blackbird.hiveagent.api.DeviceCommand
 import com.blackbird.hiveagent.api.DeviceLocationUpload
 import com.blackbird.hiveagent.api.HiveApiClient
+import com.blackbird.hiveagent.api.InstalledApplicationUpload
 import com.blackbird.hiveagent.notifications.NotificationHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -54,6 +55,7 @@ class CommandProcessor(
 
             "SHOW_MESSAGE" -> executeShowMessage(command)
 
+            "REFRESH_APPS" -> executeRefreshApps(deviceToken)
             "REQUEST_LOCATION" -> executeRequestLocation(
                 deviceToken = deviceToken,
             )
@@ -399,6 +401,97 @@ class CommandProcessor(
         }
     }
 
+    private suspend fun executeRefreshApps(
+        deviceToken: String,
+    ): CommandExecutionResult {
+        return try {
+            val packageManager = context.packageManager
+
+            @Suppress("DEPRECATION")
+            val packages =
+                packageManager.getInstalledPackages(0)
+
+            val applications =
+                packages.map { packageInfo ->
+                    val applicationInfo =
+                        packageInfo.applicationInfo
+
+                    val isSystemApp =
+                        applicationInfo != null &&
+                        (
+                            applicationInfo.flags and
+                                android.content.pm.ApplicationInfo.FLAG_SYSTEM
+                        ) != 0
+
+                    val appName =
+                        applicationInfo
+                            ?.loadLabel(packageManager)
+                            ?.toString()
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() }
+
+                    val versionCode =
+                        if (
+                            Build.VERSION.SDK_INT >=
+                                Build.VERSION_CODES.P
+                        ) {
+                            packageInfo.longVersionCode
+                        } else {
+                            @Suppress("DEPRECATION")
+                            packageInfo.versionCode.toLong()
+                        }
+
+                    InstalledApplicationUpload(
+                        packageName =
+                            packageInfo.packageName,
+                        appName = appName,
+                        versionName =
+                            packageInfo.versionName,
+                        versionCode = versionCode,
+                        isSystemApp = isSystemApp,
+                        isEnabled =
+                            applicationInfo?.enabled
+                                ?: true,
+                        firstInstalledAt =
+                            packageInfo.firstInstallTime
+                                .takeIf { it > 0L }
+                                ?.let {
+                                    java.time.Instant
+                                        .ofEpochMilli(it)
+                                        .toString()
+                                },
+                        lastUpdatedAt =
+                            packageInfo.lastUpdateTime
+                                .takeIf { it > 0L }
+                                ?.let {
+                                    java.time.Instant
+                                        .ofEpochMilli(it)
+                                        .toString()
+                                },
+                    )
+                }
+                .sortedBy {
+                    it.appName
+                        ?: it.packageName
+                }
+
+            val response =
+                apiClient.uploadInstalledApplications(
+                    deviceToken = deviceToken,
+                    applications = applications,
+                )
+
+            success(
+                "Uploaded ${response.applicationCount} installed applications.",
+            )
+        } catch (exception: Exception) {
+            failure(
+                exception.message
+                    ?: "Unable to refresh installed applications.",
+            )
+        }
+    }
+
     private fun success(
         message: String,
     ) = CommandExecutionResult(
@@ -413,3 +506,4 @@ class CommandProcessor(
         message = message,
     )
 }
+

@@ -3435,3 +3435,88 @@ body {
 .device-notification-action .primary-button {
   justify-self: start;
 }
+
+/* Sprint 02 - installed application inventory */
+
+.device-applications-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 16px;
+  color: #92929d;
+}
+
+.device-applications-summary strong {
+  color: #f4f4f5;
+  font-size: 1.2rem;
+}
+
+.device-applications-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #2d2d32;
+  border-radius: 12px;
+}
+
+.device-applications-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+}
+
+.device-applications-table th,
+.device-applications-table td {
+  padding: 13px 15px;
+  border-bottom: 1px solid #29292e;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.device-applications-table th {
+  background: #19191c;
+  color: #7f7f8a;
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.device-applications-table td {
+  color: #b4b4bd;
+  font-size: 0.76rem;
+}
+
+.device-applications-table td strong {
+  color: #f4f4f5;
+}
+
+.device-applications-table td code {
+  color: #d4d4d8;
+  overflow-wrap: anywhere;
+}
+
+.device-applications-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.device-applications-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.device-app-type {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.device-app-type-user {
+  background: rgba(34, 197, 94, 0.13);
+  color: #86efac;
+}
+
+.device-app-type-system {
+  background: rgba(113, 113, 122, 0.17);
+  color: #d4d4d8;
+}

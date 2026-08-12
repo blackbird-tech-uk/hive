@@ -26,10 +26,12 @@ import {
   createDeviceCommand,
   getDevice,
   getDeviceCommands,
+  getDeviceApplications,
   getDeviceLocationHistory,
   type Device,
   type DeviceCommand,
   type DeviceLocation,
+  type InstalledApplication,
 } from '../lib/api'
 
 
@@ -161,7 +163,7 @@ function getCommandActivityTime(
 
 export function DeviceDashboardPage() {
 const [activeTab, setActiveTab] =
-  useState<'overview' | 'activity'>(
+  useState<'overview' | 'activity' | 'applications'>(
     'overview',
   )
 
@@ -196,6 +198,15 @@ const [activeTab, setActiveTab] =
 
   const [messageBody, setMessageBody] =
     useState('')
+
+  const [applications, setApplications] =
+    useState<InstalledApplication[]>([])
+
+  const [applicationsLoading, setApplicationsLoading] =
+    useState(false)
+
+  const [applicationsError, setApplicationsError] =
+    useState<string | null>(null)
 
   const [commands, setCommands] =
   useState<DeviceCommand[]>([])
@@ -407,21 +418,63 @@ const loadLocation = useCallback(
     ],
   )
 
+  const loadApplications = useCallback(
+    async (showLoading = false) => {
+      if (!deviceId) {
+        return
+      }
+
+      try {
+        if (showLoading) {
+          setApplicationsLoading(true)
+        }
+
+        setApplicationsError(null)
+
+        const installedApplications =
+          await getDeviceApplications(deviceId)
+
+        setApplications(installedApplications)
+      } catch (loadError) {
+        setApplicationsError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Unable to load installed applications.',
+        )
+      } finally {
+        if (showLoading) {
+          setApplicationsLoading(false)
+        }
+      }
+    },
+    [deviceId],
+  )
+
   const handleRefreshApps = useCallback(
     async () => {
       await sendCommand('REFRESH_APPS')
+
+      window.setTimeout(() => {
+        void loadApplications()
+      }, 3_000)
+
+      window.setTimeout(() => {
+        void loadApplications()
+      }, 8_000)
     },
-    [sendCommand],
+    [loadApplications, sendCommand],
   )
 
 useEffect(() => {
   void loadDevice()
   void loadLocation(true)
   void loadCommands(true)
+  void loadApplications(true)
 }, [
   loadCommands,
   loadDevice,
   loadLocation,
+  loadApplications,
 ])
 
 useEffect(() => {
@@ -1005,7 +1058,20 @@ useEffect(() => {
           Overview
         </button>
 
-        <button
+                <button
+          className={
+            activeTab === 'applications'
+              ? 'device-dashboard-tab active'
+              : 'device-dashboard-tab'
+          }
+          onClick={() =>
+            setActiveTab('applications')
+          }
+          type="button"
+        >
+          Applications
+        </button>
+<button
           className={
             activeTab === 'activity'
               ? 'device-dashboard-tab device-dashboard-tab-active'
@@ -1297,6 +1363,138 @@ useEffect(() => {
         </div>
       )}
 
+      {activeTab === 'applications' && (
+        <section className="device-dashboard-panel">
+          <div className="device-dashboard-panel-header">
+            <div>
+              <p className="eyebrow">
+                APPLICATION INVENTORY
+              </p>
+
+              <h2>
+                Installed applications
+              </h2>
+            </div>
+
+            <button
+              aria-label="Refresh installed applications"
+              className="icon-button"
+              disabled={applicationsLoading}
+              onClick={() =>
+                void loadApplications(true)
+              }
+              type="button"
+            >
+              <RefreshCw
+                aria-hidden="true"
+                className={
+                  applicationsLoading
+                    ? 'spin'
+                    : ''
+                }
+                size={17}
+              />
+            </button>
+          </div>
+
+          <div className="device-applications-summary">
+            <strong>
+              {applications.length}
+            </strong>
+
+            <span>
+              applications reported
+            </span>
+          </div>
+
+          {applicationsLoading &&
+          applications.length === 0 ? (
+            <div className="device-dashboard-empty">
+              <p>
+                Loading installed applications...
+              </p>
+            </div>
+          ) : applicationsError ? (
+            <p
+              className="device-dashboard-command-error"
+              role="alert"
+            >
+              {applicationsError}
+            </p>
+          ) : applications.length === 0 ? (
+            <div className="device-dashboard-empty">
+              <p>
+                No application inventory has been reported yet.
+              </p>
+
+              <p>
+                Use Refresh Apps to request an inventory from the device.
+              </p>
+            </div>
+          ) : (
+            <div className="device-applications-table-wrapper">
+              <table className="device-applications-table">
+                <thead>
+                  <tr>
+                    <th>Application</th>
+                    <th>Package</th>
+                    <th>Version</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {applications.map(
+                    (application) => (
+                      <tr key={application.id}>
+                        <td>
+                          <strong>
+                            {application.app_name ??
+                              application.package_name}
+                          </strong>
+                        </td>
+
+                        <td>
+                          <code>
+                            {application.package_name}
+                          </code>
+                        </td>
+
+                        <td>
+                          {application.version_name ??
+                            'Not reported'}
+                        </td>
+
+                        <td>
+                          <span
+                            className={`device-app-type ${
+                              application.is_system_app
+                                ? 'device-app-type-system'
+                                : 'device-app-type-user'
+                            }`}
+                          >
+                            {application.is_system_app
+                              ? 'System'
+                              : 'User'}
+                          </span>
+                        </td>
+
+                        <td>
+                          {application.is_enabled
+                            ? 'Enabled'
+                            : 'Disabled'}
+                        </td>
+                      </tr>
+                    ),
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
       {activeTab === 'activity' && (
           <section className="device-dashboard-panel">
   <div className="device-dashboard-panel-header">
@@ -1313,8 +1511,8 @@ useEffect(() => {
       className="icon-button"
       disabled={commandsLoading}
       onClick={() =>
-        void loadCommands(true)
-      }
+  void loadCommands(true)
+}
       type="button"
     >
       <RefreshCw
@@ -1389,7 +1587,7 @@ useEffect(() => {
                   {formatRelativeTime(
                     activityTime,
                   )}
-                  {' Â· '}
+                  {' · '}
                   {formatDateTime(
                     activityTime,
                   )}
@@ -1406,3 +1604,4 @@ useEffect(() => {
     </section>
   )
 }
+
