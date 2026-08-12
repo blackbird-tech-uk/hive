@@ -1,4 +1,4 @@
-﻿package com.blackbird.hiveagent.api
+package com.blackbird.hiveagent.api
 
 import com.blackbird.hiveagent.BuildConfig
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +34,10 @@ class HiveApiClient(
             putNullable("supports_lock_task", payload.supportsLockTask)
             putNullable("supports_device_lock", payload.supportsDeviceLock)
             putNullable("is_lock_task_active", payload.isLockTaskActive)
+            putNullable("supports_camera_policy", payload.supportsCameraPolicy)
+            putNullable("supports_lock_timeout_policy", payload.supportsLockTimeoutPolicy)
+            putNullable("camera_disabled", payload.cameraDisabled)
+            putNullable("maximum_time_to_lock_ms", payload.maximumTimeToLockMs)
         }
 
         return parseHeartbeatResponse(

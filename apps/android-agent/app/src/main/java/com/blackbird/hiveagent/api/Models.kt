@@ -15,6 +15,10 @@ data class DeviceHeartbeatRequest(
     val supportsLockTask: Boolean?,
     val supportsDeviceLock: Boolean?,
     val isLockTaskActive: Boolean?,
+    val supportsCameraPolicy: Boolean?,
+    val supportsLockTimeoutPolicy: Boolean?,
+    val cameraDisabled: Boolean?,
+    val maximumTimeToLockMs: Long?,
 )
 
 data class DeviceCommand(
@@ -78,6 +82,7 @@ data class InstalledApplicationInventoryResponse(
     val applicationCount: Int,
     val reportedAt: String,
 )
+
 
 
 

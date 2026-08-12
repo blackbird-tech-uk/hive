@@ -81,6 +81,8 @@ class CommandProcessor(
 
             "LOCK_DEVICE" -> executeLockDevice()
 
+            "SET_CAMERA_DISABLED" -> executeSetCameraDisabled(command)
+            "SET_LOCK_TIMEOUT" -> executeSetLockTimeout(command)
             else -> failure(
                 "Unsupported command: ${command.command}",
             )
@@ -88,6 +90,112 @@ class CommandProcessor(
     }
 
 
+    private fun hasManagedPolicyCapability(): Boolean {
+        return devicePolicyManager.isDeviceOwnerApp(
+            context.packageName,
+        ) || devicePolicyManager.isAdminActive(
+            adminComponent,
+        )
+    }
+
+    private fun executeSetCameraDisabled(
+        command: DeviceCommand,
+    ): CommandExecutionResult {
+        if (!hasManagedPolicyCapability()) {
+            return failure(
+                "Camera policy requires active Device Admin or Device Owner capability.",
+            )
+        }
+
+        val disabled =
+            when (val value = command.payload["disabled"]) {
+                is Boolean -> value
+                is String -> value.toBooleanStrictOrNull()
+                else -> null
+            }
+                ?: return failure(
+                    "SET_CAMERA_DISABLED requires a boolean disabled value.",
+                )
+
+        return try {
+            devicePolicyManager.setCameraDisabled(
+                adminComponent,
+                disabled,
+            )
+
+            success(
+                if (disabled) {
+                    "Camera disabled by Hive policy."
+                } else {
+                    "Camera enabled by Hive policy."
+                },
+            )
+        } catch (exception: SecurityException) {
+            failure(
+                exception.message
+                    ?: "Android rejected the camera policy.",
+            )
+        } catch (exception: Exception) {
+            failure(
+                exception.message
+                    ?: "Unable to update camera policy.",
+            )
+        }
+    }
+
+    private fun executeSetLockTimeout(
+        command: DeviceCommand,
+    ): CommandExecutionResult {
+        if (!hasManagedPolicyCapability()) {
+            return failure(
+                "Screen lock timeout requires active Device Admin or Device Owner capability.",
+            )
+        }
+
+        val timeoutMs =
+            when (val value = command.payload["timeout_ms"]) {
+                is Number -> value.toLong()
+                is String -> value.toLongOrNull()
+                else -> null
+            }
+                ?: return failure(
+                    "SET_LOCK_TIMEOUT requires timeout_ms.",
+                )
+
+        if (
+            timeoutMs < 0L ||
+            timeoutMs > 86_400_000L
+        ) {
+            return failure(
+                "Screen lock timeout must be between 0 and 86400000 milliseconds.",
+            )
+        }
+
+        return try {
+            devicePolicyManager.setMaximumTimeToLock(
+                adminComponent,
+                timeoutMs,
+            )
+
+            success(
+                if (timeoutMs == 0L) {
+                    "Hive screen lock timeout restriction cleared."
+                } else {
+                    "Hive screen lock timeout set to ${timeoutMs / 60_000L} minute(s)."
+                },
+            )
+        } catch (exception: SecurityException) {
+            failure(
+                exception.message
+                    ?: "Android rejected the screen lock timeout policy.",
+            )
+        } catch (exception: Exception) {
+            failure(
+                exception.message
+                    ?: "Unable to update screen lock timeout policy.",
+            )
+        }
+    }
     private fun executeLockDevice(): CommandExecutionResult {
         val isDeviceOwner =
             devicePolicyManager.isDeviceOwnerApp(
@@ -687,6 +795,8 @@ class CommandProcessor(
         message = message,
     )
 }
+
+
 
 
 

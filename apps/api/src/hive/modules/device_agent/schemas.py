@@ -31,6 +31,10 @@ class DeviceAgentResponse(BaseModel):
     supports_lock_task: bool | None = None
     supports_device_lock: bool | None = None
     is_lock_task_active: bool | None = None
+    supports_camera_policy: bool | None = None
+    supports_lock_timeout_policy: bool | None = None
+    camera_disabled: bool | None = None
+    maximum_time_to_lock_ms: int | None = None
     enrolled_at: datetime | None = None
     last_seen_at: datetime | None = None
 
@@ -92,6 +96,10 @@ class DeviceHeartbeatRequest(BaseModel):
     supports_lock_task: bool | None = None
     supports_device_lock: bool | None = None
     is_lock_task_active: bool | None = None
+    supports_camera_policy: bool | None = None
+    supports_lock_timeout_policy: bool | None = None
+    camera_disabled: bool | None = None
+    maximum_time_to_lock_ms: int | None = None
 
 
 class DeviceCommandDelivery(BaseModel):
@@ -179,6 +187,7 @@ class DeviceLocationResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
 
 
 

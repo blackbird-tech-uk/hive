@@ -60,6 +60,38 @@ class DeviceInfoProvider(
         val supportsDeviceLock =
             isDeviceOwner || isDeviceAdmin
 
+        val supportsCameraPolicy =
+            isDeviceOwner
+
+        val supportsLockTimeoutPolicy =
+            isDeviceOwner || isDeviceAdmin
+
+        val cameraDisabled =
+            if (supportsCameraPolicy) {
+                try {
+                    devicePolicyManager.getCameraDisabled(
+                        adminComponent,
+                    )
+                } catch (_: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+
+        val maximumTimeToLockMs =
+            if (supportsLockTimeoutPolicy) {
+                try {
+                    devicePolicyManager.getMaximumTimeToLock(
+                        adminComponent,
+                    )
+                } catch (_: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+
         val activityManager =
             applicationContext.getSystemService(
                 Context.ACTIVITY_SERVICE,
@@ -98,6 +130,14 @@ class DeviceInfoProvider(
                 supportsDeviceLock,
             isLockTaskActive =
                 isLockTaskActive,
+            supportsCameraPolicy =
+                supportsCameraPolicy,
+            supportsLockTimeoutPolicy =
+                supportsLockTimeoutPolicy,
+            cameraDisabled =
+                cameraDisabled,
+            maximumTimeToLockMs =
+                maximumTimeToLockMs,
         )
     }
 
@@ -142,6 +182,10 @@ class DeviceInfoProvider(
         }
     }
 }
+
+
+
+
 
 
 

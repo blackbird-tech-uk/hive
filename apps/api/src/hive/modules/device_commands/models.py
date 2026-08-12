@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import enum
 import uuid
@@ -15,6 +15,8 @@ from hive.db.base import Base
 
 class DeviceCommandType(str, enum.Enum):
     LOCK_DEVICE = "LOCK_DEVICE"
+    SET_CAMERA_DISABLED = "SET_CAMERA_DISABLED"
+    SET_LOCK_TIMEOUT = "SET_LOCK_TIMEOUT"
     REBOOT = "REBOOT"
     SYNC = "SYNC"
     PING = "PING"

@@ -70,6 +70,12 @@ export interface Device {
   supports_lock_task: boolean
   supports_device_lock: boolean
   is_lock_task_active: boolean
+  supports_camera_policy: boolean
+  supports_lock_timeout_policy: boolean
+  camera_disabled: boolean | null
+  maximum_time_to_lock_ms: number | null
+  desired_camera_disabled: boolean | null
+  desired_maximum_time_to_lock_ms: number | null
   battery_level: number | null
   is_charging: boolean | null
 
@@ -260,6 +266,7 @@ export interface EnrollmentTokenResponse {
 export interface ApiErrorBody {
   detail?: string
 }
+
 
 
 

@@ -1313,7 +1313,167 @@ useEffect(() => {
                 </small>
               </div>
             </div>
+          </section>          <section className="device-policy-management">
+            <div>
+              <p className="eyebrow">
+                MANAGED POLICIES
+              </p>
+
+              <h2>Managed policies</h2>
+
+              <p className="device-policy-management-note">
+                These controls use Android Device Admin on this device.
+                Changes are securely queued through Hive.
+              </p>
+            </div>
+
+            <div className="device-policy-management-grid">
+              <article>
+                <div>
+                  <span>Camera access</span>
+
+                  <strong>
+                    {device.camera_disabled === true
+                      ? 'Disabled'
+                      : device.camera_disabled === false
+                        ? 'Enabled'
+                        : 'Not reported'}
+                  </strong>
+
+                  <small>
+                    Desired:{' '}
+                    {device.desired_camera_disabled === true
+                      ? 'Disabled'
+                      : device.desired_camera_disabled === false
+                        ? 'Enabled'
+                        : 'No policy set'}
+                  </small>
+                </div>
+
+                <div className="device-policy-buttons">
+                  <button
+                    className="secondary-button"
+                    disabled={
+                      sendingCommand !== null ||
+                      !device.supports_camera_policy ||
+                      device.camera_disabled === false
+                    }
+                    onClick={() =>
+                      void sendCommand(
+                        'SET_CAMERA_DISABLED',
+                        { disabled: false },
+                      ).then(() => {
+                        window.setTimeout(() => {
+                          void loadDevice()
+                        }, 2_000)
+                      })
+                    }
+                    type="button"
+                  >
+                    Enable camera
+                  </button>
+
+                  <button
+                    className="secondary-button"
+                    disabled={
+                      sendingCommand !== null ||
+                      !device.supports_camera_policy ||
+                      device.camera_disabled === true
+                    }
+                    onClick={() =>
+                      void sendCommand(
+                        'SET_CAMERA_DISABLED',
+                        { disabled: true },
+                      ).then(() => {
+                        window.setTimeout(() => {
+                          void loadDevice()
+                        }, 2_000)
+                      })
+                    }
+                    type="button"
+                  >
+                    Disable camera
+                  </button>
+                </div>
+              </article>
+
+              <article>
+                <div>
+                  <span>Screen lock timeout</span>
+
+                  <strong>
+                    {device.maximum_time_to_lock_ms == null
+                      ? 'Not reported'
+                      : device.maximum_time_to_lock_ms === 0
+                        ? 'System default'
+                        : `${Math.round(
+                            device.maximum_time_to_lock_ms / 60_000,
+                          )} min`}
+                  </strong>
+
+                  <small>
+                    Maximum idle time before Android locks.
+                  </small>
+                </div>
+
+                <select
+                  aria-label="Screen lock timeout"
+                  className="device-policy-select"
+                  disabled={
+                    sendingCommand !== null ||
+                    !device.supports_lock_timeout_policy
+                  }
+                  onChange={(event) => {
+                    const timeoutMs = Number(
+                      event.target.value,
+                    )
+
+                    void sendCommand(
+                      'SET_LOCK_TIMEOUT',
+                      { timeout_ms: timeoutMs },
+                    ).then(() => {
+                      window.setTimeout(() => {
+                        void loadDevice()
+                      }, 2_000)
+                    })
+                  }}
+                  value={
+                    device.desired_maximum_time_to_lock_ms ??
+                    device.maximum_time_to_lock_ms ??
+                    0
+                  }
+                >
+                  <option value={0}>
+                    System default
+                  </option>
+
+                  <option value={60000}>
+                    1 minute
+                  </option>
+
+                  <option value={300000}>
+                    5 minutes
+                  </option>
+
+                  <option value={900000}>
+                    15 minutes
+                  </option>
+
+                  <option value={1800000}>
+                    30 minutes
+                  </option>
+                </select>
+              </article>
+            </div>
+
+            {(!device.supports_camera_policy ||
+              !device.supports_lock_timeout_policy) && (
+              <p className="device-enterprise-note">
+                Activate Device Admin before using managed policy controls.
+              </p>
+            )}
           </section>
+
           <section className="device-dashboard-panel">
             <div className="device-dashboard-panel-header">
               <div>
@@ -1687,6 +1847,7 @@ useEffect(() => {
     </section>
   )
 }
+
 
 
 

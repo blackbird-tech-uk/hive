@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import enum
 import uuid
@@ -190,6 +190,39 @@ class Device(Base):
         nullable=False,
         default=False,
     )
+
+    supports_camera_policy: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    supports_lock_timeout_policy: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    camera_disabled: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+    )
+
+    maximum_time_to_lock_ms: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    desired_camera_disabled: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+    )
+
+    desired_maximum_time_to_lock_ms: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
     battery_level: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,

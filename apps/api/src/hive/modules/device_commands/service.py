@@ -47,11 +47,26 @@ class DeviceCommandService:
                 "Device does not exist in this organization.",
             )
 
+        self._validate_policy_command(
+            device=device,
+            payload=payload,
+        )
+
         command = DeviceCommand(
             device_id=device.id,
             command=payload.command,
             payload=payload.payload,
         )
+
+        if payload.command.value == "SET_CAMERA_DISABLED":
+            device.desired_camera_disabled = bool(
+                (payload.payload or {})["disabled"]
+            )
+
+        if payload.command.value == "SET_LOCK_TIMEOUT":
+            device.desired_maximum_time_to_lock_ms = int(
+                (payload.payload or {})["timeout_ms"]
+            )
 
         command = self.commands.add(command)
         self.db.commit()
@@ -59,6 +74,45 @@ class DeviceCommandService:
 
         return command
 
+    @staticmethod
+    def _validate_policy_command(
+        *,
+        device,
+        payload: DeviceCommandCreate,
+    ) -> None:
+        command = payload.command.value
+        command_payload = payload.payload or {}
+
+        if command == "SET_CAMERA_DISABLED":
+            if not device.supports_camera_policy:
+                raise ValueError(
+                    "Camera policy is unavailable on this device."
+                )
+
+            disabled = command_payload.get("disabled")
+
+            if not isinstance(disabled, bool):
+                raise ValueError(
+                    "SET_CAMERA_DISABLED requires a boolean disabled value."
+                )
+
+        if command == "SET_LOCK_TIMEOUT":
+            if not device.supports_lock_timeout_policy:
+                raise ValueError(
+                    "Screen lock timeout policy is unavailable on this device."
+                )
+
+            timeout_ms = command_payload.get("timeout_ms")
+
+            if (
+                isinstance(timeout_ms, bool)
+                or not isinstance(timeout_ms, int)
+                or timeout_ms < 0
+                or timeout_ms > 86_400_000
+            ):
+                raise ValueError(
+                    "SET_LOCK_TIMEOUT requires timeout_ms between 0 and 86400000."
+                )
     def list_device_commands(
         self,
         device_id: uuid.UUID,

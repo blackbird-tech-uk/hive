@@ -128,6 +128,26 @@ class DeviceAgentService:
 
         if payload.is_lock_task_active is not None:
             device.is_lock_task_active = payload.is_lock_task_active
+
+        if payload.supports_camera_policy is not None:
+            device.supports_camera_policy = (
+                payload.supports_camera_policy
+            )
+
+        if payload.supports_lock_timeout_policy is not None:
+            device.supports_lock_timeout_policy = (
+                payload.supports_lock_timeout_policy
+            )
+
+        if payload.camera_disabled is not None:
+            device.camera_disabled = (
+                payload.camera_disabled
+            )
+
+        if payload.maximum_time_to_lock_ms is not None:
+            device.maximum_time_to_lock_ms = (
+                payload.maximum_time_to_lock_ms
+            )
         delivered_commands: list[
             DeviceCommandDelivery
         ] = []
@@ -241,6 +261,7 @@ class DeviceAgentService:
         cleaned = value.strip()
 
         return cleaned or None
+
 
 
 

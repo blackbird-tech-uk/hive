@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import uuid
 from datetime import datetime
@@ -55,6 +55,12 @@ class DeviceResponse(BaseModel):
     supports_lock_task: bool
     supports_device_lock: bool
     is_lock_task_active: bool
+    supports_camera_policy: bool
+    supports_lock_timeout_policy: bool
+    camera_disabled: bool | None
+    maximum_time_to_lock_ms: int | None
+    desired_camera_disabled: bool | None
+    desired_maximum_time_to_lock_ms: int | None
     battery_level: int | None
     is_charging: bool | None
     wifi_ssid: str | None
