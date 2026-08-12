@@ -1,6 +1,8 @@
 ﻿package com.blackbird.hiveagent
 
 import android.Manifest
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -9,6 +11,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -71,6 +75,44 @@ fun HiveAgentScreen(
         hiveViewModel.uiState.collectAsState()
 
     val context = LocalContext.current
+
+    val adminComponent = ComponentName(
+        context,
+        HiveDeviceAdminReceiver::class.java,
+    )
+
+    var isDeviceAdminActive by rememberSaveable {
+        mutableStateOf(
+            (context.getSystemService(
+                android.content.Context.DEVICE_POLICY_SERVICE,
+            ) as DevicePolicyManager).isAdminActive(adminComponent),
+        )
+    }
+
+    val deviceAdminLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) {
+            val policyManager =
+                context.getSystemService(
+                    android.content.Context.DEVICE_POLICY_SERVICE,
+                ) as DevicePolicyManager
+
+            isDeviceAdminActive =
+                policyManager.isAdminActive(adminComponent)
+
+            hiveViewModel.loadDevice()
+
+            if (uiState.isEnrolled) {
+                startForegroundService(
+                    context,
+                    Intent(
+                        context,
+                        CommandPollingService::class.java,
+                    ),
+                )
+            }
+        }
 
     val locationPermissionLauncher =
         rememberLauncherForActivityResult(
@@ -148,7 +190,24 @@ fun HiveAgentScreen(
                     hiveViewModel::loadDevice,
                 onClearEnrolment =
                     hiveViewModel::clearEnrolment,
-            )
+                isDeviceAdminActive =
+                    isDeviceAdminActive,
+                onActivateDeviceAdmin = {
+                    val intent = Intent(
+                        DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN,
+                    ).apply {
+                        putExtra(
+                            DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                            adminComponent,
+                        )
+                        putExtra(
+                            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                            "Allow Hive to securely lock this managed device.",
+                        )
+                    }
+
+                    deviceAdminLauncher.launch(intent)
+                },            )
         }
 
         else -> {
@@ -170,6 +229,7 @@ private fun LoadingScreen() {
         modifier =
             Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
         verticalArrangement =
             Arrangement.Center,
@@ -245,6 +305,7 @@ private fun EnrolmentScreen(
         modifier =
             Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
         verticalArrangement =
             Arrangement.Center,
@@ -410,6 +471,8 @@ private fun EnrolledDeviceScreen(
     uiState: HiveUiState,
     onRefresh: () -> Unit,
     onClearEnrolment: () -> Unit,
+    isDeviceAdminActive: Boolean,
+    onActivateDeviceAdmin: () -> Unit,
 ) {
     val device =
         uiState.device ?: return
@@ -418,6 +481,7 @@ private fun EnrolledDeviceScreen(
         modifier =
             Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
         verticalArrangement =
             Arrangement.spacedBy(16.dp),
@@ -500,6 +564,50 @@ private fun EnrolledDeviceScreen(
             }
         }
 
+        Card(
+            modifier =
+                Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier =
+                    Modifier.padding(16.dp),
+                verticalArrangement =
+                    Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Device management",
+                    style =
+                        MaterialTheme.typography
+                            .titleMedium,
+                )
+
+                Text(
+                    if (isDeviceAdminActive) {
+                        "Device Admin is active. Hive can use supported management controls such as remote screen lock."
+                    } else {
+                        "Device Admin is not active. Enable it to allow supported Hive management controls without factory resetting this device."
+                    },
+                )
+
+                if (!isDeviceAdminActive) {
+                    Button(
+                        onClick = onActivateDeviceAdmin,
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Activate Device Admin")
+                    }
+                } else {
+                    Text(
+                        text = "Device Admin active",
+                        color =
+                            MaterialTheme.colorScheme
+                                .primary,
+                    )
+                }
+            }
+        }
+
         Button(
             onClick = onRefresh,
             modifier =
@@ -520,3 +628,5 @@ private fun EnrolledDeviceScreen(
         }
     }
 }
+
+
