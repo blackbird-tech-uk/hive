@@ -36,3 +36,6 @@ Thumbs.db
 
 # Containers / data
 postgres_data/
+
+# Hive local sprint workspace
+.hive-sprint/
