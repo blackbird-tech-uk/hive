@@ -1,7 +1,9 @@
-package com.blackbird.hiveagent
+﻿package com.blackbird.hiveagent
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,7 +37,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.startForegroundService
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.blackbird.hiveagent.service.CommandPollingService
 import com.blackbird.hiveagent.ui.theme.HiveAgentTheme
 
 class MainActivity : ComponentActivity() {
@@ -74,6 +78,12 @@ fun HiveAgentScreen(
                 .RequestPermission(),
         ) { }
 
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts
+                .RequestPermission(),
+        ) { }
+
     LaunchedEffect(Unit) {
         if (
             ContextCompat.checkSelfPermission(
@@ -91,7 +101,38 @@ fun HiveAgentScreen(
     }
 
     LaunchedEffect(Unit) {
+        if (
+            Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
+        }
+    }
+
+    LaunchedEffect(Unit) {
         hiveViewModel.loadDevice()
+    }
+
+    LaunchedEffect(uiState.isEnrolled) {
+        val serviceIntent = Intent(
+            context,
+            CommandPollingService::class.java,
+        )
+
+        if (uiState.isEnrolled) {
+            startForegroundService(
+                context,
+                serviceIntent,
+            )
+        } else {
+            context.stopService(serviceIntent)
+        }
     }
 
     when {
@@ -140,7 +181,7 @@ private fun LoadingScreen() {
                 Modifier.height(16.dp),
         )
 
-        Text("Connecting to Hive…")
+        Text("Connecting to Hiveâ€¦")
     }
 }
 
@@ -356,7 +397,7 @@ private fun EnrolmentScreen(
                         ),
                 )
 
-                Text("Enrolling…")
+                Text("Enrollingâ€¦")
             } else {
                 Text("Enrol device")
             }

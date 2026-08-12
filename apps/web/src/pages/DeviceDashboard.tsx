@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowLeft,
   BatteryCharging,
   Bell,
@@ -188,6 +188,15 @@ const [activeTab, setActiveTab] =
   const [commandError, setCommandError] =
     useState<string | null>(null)
 
+  const [messageComposerOpen, setMessageComposerOpen] =
+    useState(false)
+
+  const [messageTitle, setMessageTitle] =
+    useState('Hive message')
+
+  const [messageBody, setMessageBody] =
+    useState('')
+
   const [commands, setCommands] =
   useState<DeviceCommand[]>([])
 
@@ -366,6 +375,45 @@ const loadLocation = useCallback(
   [deviceId, loadLocation],
 )
 
+  const handleSendMessage = useCallback(
+    async () => {
+      const cleanMessage = messageBody.trim()
+
+      if (!cleanMessage) {
+        setCommandNotice(null)
+        setCommandError(
+          'Enter a message before sending.',
+        )
+        return
+      }
+
+      await sendCommand(
+        'SHOW_MESSAGE',
+        {
+          title:
+            messageTitle.trim() ||
+            'Hive message',
+          message: cleanMessage,
+        },
+      )
+
+      setMessageComposerOpen(false)
+      setMessageBody('')
+    },
+    [
+      messageBody,
+      messageTitle,
+      sendCommand,
+    ],
+  )
+
+  const handleRefreshApps = useCallback(
+    async () => {
+      await sendCommand('REFRESH_APPS')
+    },
+    [sendCommand],
+  )
+
 useEffect(() => {
   void loadDevice()
   void loadLocation(true)
@@ -472,7 +520,7 @@ useEffect(() => {
               </span>
 
               <span aria-hidden="true">
-                •
+                â€¢
               </span>
 
               <span>
@@ -483,7 +531,7 @@ useEffect(() => {
               {device.hive_id ? (
                 <>
                   <span aria-hidden="true">
-                    •
+                    â€¢
                   </span>
 
                   <code>
@@ -617,8 +665,12 @@ useEffect(() => {
 
           <button
             className="device-dashboard-action"
-            disabled
-            title="Message composer will be added next"
+            disabled={sendingCommand !== null}
+            onClick={() => {
+              setCommandError(null)
+              setCommandNotice(null)
+              setMessageComposerOpen(true)
+            }}
             type="button"
           >
             <MessageSquare
@@ -627,10 +679,40 @@ useEffect(() => {
             />
 
             <span>
-              <strong>Message</strong>
+              <strong>
+                {sendingCommand === 'SHOW_MESSAGE'
+                  ? 'Queuing...'
+                  : 'Message'}
+              </strong>
 
               <small>
                 Display a device message
+              </small>
+            </span>
+          </button>
+
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() =>
+              void handleRefreshApps()
+            }
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand === 'REFRESH_APPS'
+                  ? 'Queuing...'
+                  : 'Refresh apps'}
+              </strong>
+
+              <small>
+                Request installed app inventory
               </small>
             </span>
           </button>
@@ -649,7 +731,7 @@ useEffect(() => {
             />
 
             <span>
-              <strong>Refresh</strong>
+              <strong>Refresh telemetry</strong>
 
               <small>
                 Reload device telemetry
@@ -676,6 +758,128 @@ useEffect(() => {
           </p>
         )}
       </section>
+
+      {messageComposerOpen && (
+        <div
+          className="modal-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setMessageComposerOpen(false)
+            }
+          }}
+          role="presentation"
+        >
+          <section
+            aria-labelledby="device-message-title"
+            aria-modal="true"
+            className="modal"
+            role="dialog"
+          >
+            <header className="modal-header">
+              <div>
+                <p className="eyebrow">
+                  REMOTE MESSAGE
+                </p>
+
+                <h2 id="device-message-title">
+                  Send message to device
+                </h2>
+              </div>
+
+              <button
+                aria-label="Close message composer"
+                className="modal-close-button"
+                disabled={
+                  sendingCommand ===
+                  'SHOW_MESSAGE'
+                }
+                onClick={() =>
+                  setMessageComposerOpen(false)
+                }
+                type="button"
+              >
+                Ã—
+              </button>
+            </header>
+
+            <div className="event-form">
+              <label>
+                Title
+
+                <input
+                  disabled={
+                    sendingCommand ===
+                    'SHOW_MESSAGE'
+                  }
+                  maxLength={120}
+                  onChange={(event) =>
+                    setMessageTitle(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Hive message"
+                  type="text"
+                  value={messageTitle}
+                />
+              </label>
+
+              <label>
+                Message
+
+                <textarea
+                  autoFocus
+                  disabled={
+                    sendingCommand ===
+                    'SHOW_MESSAGE'
+                  }
+                  maxLength={1000}
+                  onChange={(event) =>
+                    setMessageBody(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Enter the message to display on the device..."
+                  rows={5}
+                  value={messageBody}
+                />
+              </label>
+            </div>
+
+            <footer className="modal-actions">
+              <button
+                className="secondary-button"
+                disabled={
+                  sendingCommand ===
+                  'SHOW_MESSAGE'
+                }
+                onClick={() =>
+                  setMessageComposerOpen(false)
+                }
+                type="button"
+              >
+                Cancel
+              </button>
+
+              <button
+                className="primary-button"
+                disabled={
+                  sendingCommand !== null ||
+                  !messageBody.trim()
+                }
+                onClick={() =>
+                  void handleSendMessage()
+                }
+                type="button"
+              >
+                {sendingCommand ===
+                'SHOW_MESSAGE'
+                  ? 'Sending...'
+                  : 'Send message'}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
 
       <section
         aria-label="Device summary"
@@ -1185,7 +1389,7 @@ useEffect(() => {
                   {formatRelativeTime(
                     activityTime,
                   )}
-                  {' · '}
+                  {' Â· '}
                   {formatDateTime(
                     activityTime,
                   )}

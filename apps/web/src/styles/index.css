@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   color: #f5f5f5;
   background: #0b0b0d;
   font-family: Inter, system-ui, sans-serif;
@@ -2881,7 +2881,7 @@ body {
 .device-dashboard-action-grid {
   display: grid;
   grid-template-columns:
-    repeat(5, minmax(0, 1fr));
+    repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 
