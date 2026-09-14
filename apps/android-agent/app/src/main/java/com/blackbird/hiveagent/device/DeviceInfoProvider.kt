@@ -1,4 +1,4 @@
-﻿package com.blackbird.hiveagent.device
+package com.blackbird.hiveagent.device
 
 import android.Manifest
 import android.app.ActivityManager
@@ -17,61 +17,27 @@ import com.blackbird.hiveagent.data.telemetry.DeviceTelemetry
 class DeviceInfoProvider(
     context: Context,
 ) {
-    private val applicationContext =
-        context.applicationContext
+    private val applicationContext = context.applicationContext
 
-    private val devicePolicyManager =
-        applicationContext.getSystemService(
-            Context.DEVICE_POLICY_SERVICE,
-        ) as DevicePolicyManager
+    private val devicePolicyManager = applicationContext.getSystemService(
+        Context.DEVICE_POLICY_SERVICE,
+    ) as DevicePolicyManager
 
-    private val adminComponent =
-        ComponentName(
+    private val adminComponent = ComponentName(
+        applicationContext,
+        HiveDeviceAdminReceiver::class.java,
+    )
+
+    fun createHeartbeatRequest(): DeviceHeartbeatRequest {
+        val telemetry = DeviceTelemetry.collect(applicationContext)
+        val capabilities = EnterpriseCapabilityDetector.detect(
             applicationContext,
-            HiveDeviceAdminReceiver::class.java,
         )
 
-    fun createHeartbeatRequest():
-        DeviceHeartbeatRequest {
-        val telemetry =
-            DeviceTelemetry.collect(
-                applicationContext,
-            )
-        val isDeviceOwner =
-            devicePolicyManager.isDeviceOwnerApp(
-                applicationContext.packageName,
-            )
-
-        val isDeviceAdmin =
-            devicePolicyManager.isAdminActive(
-                adminComponent,
-            )
-
-        val managementMode =
-            when {
-                isDeviceOwner -> "device_owner"
-                isDeviceAdmin -> "device_admin"
-                else -> "standard"
-            }
-
-        val supportsLockTask =
-            isDeviceOwner
-
-        val supportsDeviceLock =
-            isDeviceOwner || isDeviceAdmin
-
-        val supportsCameraPolicy =
-            isDeviceOwner
-
-        val supportsLockTimeoutPolicy =
-            isDeviceOwner || isDeviceAdmin
-
         val cameraDisabled =
-            if (supportsCameraPolicy) {
+            if (capabilities.supportsCameraPolicy) {
                 try {
-                    devicePolicyManager.getCameraDisabled(
-                        adminComponent,
-                    )
+                    devicePolicyManager.getCameraDisabled(adminComponent)
                 } catch (_: Exception) {
                     null
                 }
@@ -80,11 +46,9 @@ class DeviceInfoProvider(
             }
 
         val maximumTimeToLockMs =
-            if (supportsLockTimeoutPolicy) {
+            if (capabilities.supportsLockTimeoutPolicy) {
                 try {
-                    devicePolicyManager.getMaximumTimeToLock(
-                        adminComponent,
-                    )
+                    devicePolicyManager.getMaximumTimeToLock(adminComponent)
                 } catch (_: Exception) {
                     null
                 }
@@ -92,52 +56,32 @@ class DeviceInfoProvider(
                 null
             }
 
-        val activityManager =
-            applicationContext.getSystemService(
-                Context.ACTIVITY_SERVICE,
-            ) as ActivityManager
+        val activityManager = applicationContext.getSystemService(
+            Context.ACTIVITY_SERVICE,
+        ) as ActivityManager
 
         val isLockTaskActive =
-            activityManager.lockTaskModeState !=
-                ActivityManager.LOCK_TASK_MODE_NONE
+            activityManager.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE
 
         return DeviceHeartbeatRequest(
-            batteryLevel =
-                telemetry.batteryLevel,
-            isCharging =
-                telemetry.isCharging,
-            wifiSsid =
-                telemetry.wifiSsid,
-            ipAddress =
-                telemetry.ipAddress,
-            imei =
-                readImei(),
-            agentVersion =
-                BuildConfig.VERSION_NAME,
-            androidVersion =
-                Build.VERSION.RELEASE,
-            buildVersion =
-                Build.DISPLAY,
-            managementMode =
-                managementMode,
-            isDeviceAdmin =
-                isDeviceAdmin,
-            isDeviceOwner =
-                isDeviceOwner,
-            supportsLockTask =
-                supportsLockTask,
-            supportsDeviceLock =
-                supportsDeviceLock,
-            isLockTaskActive =
-                isLockTaskActive,
-            supportsCameraPolicy =
-                supportsCameraPolicy,
-            supportsLockTimeoutPolicy =
-                supportsLockTimeoutPolicy,
-            cameraDisabled =
-                cameraDisabled,
-            maximumTimeToLockMs =
-                maximumTimeToLockMs,
+            batteryLevel = telemetry.batteryLevel,
+            isCharging = telemetry.isCharging,
+            wifiSsid = telemetry.wifiSsid,
+            ipAddress = telemetry.ipAddress,
+            imei = readImei(),
+            agentVersion = BuildConfig.VERSION_NAME,
+            androidVersion = Build.VERSION.RELEASE,
+            buildVersion = Build.DISPLAY,
+            managementMode = capabilities.managementMode,
+            isDeviceAdmin = capabilities.isDeviceAdmin,
+            isDeviceOwner = capabilities.isDeviceOwner,
+            supportsLockTask = capabilities.supportsLockTask,
+            supportsDeviceLock = capabilities.supportsDeviceLock,
+            isLockTaskActive = isLockTaskActive,
+            supportsCameraPolicy = capabilities.supportsCameraPolicy,
+            supportsLockTimeoutPolicy = capabilities.supportsLockTimeoutPolicy,
+            cameraDisabled = cameraDisabled,
+            maximumTimeToLockMs = maximumTimeToLockMs,
         )
     }
 
@@ -153,28 +97,19 @@ class DeviceInfoProvider(
         }
 
         return try {
-            val telephonyManager =
-                applicationContext.getSystemService(
-                    Context.TELEPHONY_SERVICE,
-                ) as TelephonyManager
+            val telephonyManager = applicationContext.getSystemService(
+                Context.TELEPHONY_SERVICE,
+            ) as TelephonyManager
 
-            val imei =
-                if (
-                    Build.VERSION.SDK_INT >=
-                    Build.VERSION_CODES.O
-                ) {
-                    telephonyManager.imei
-                } else {
-                    telephonyManager.deviceId
-                }
+            val imei = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                telephonyManager.imei
+            } else {
+                telephonyManager.deviceId
+            }
 
             imei
                 ?.trim()
-                ?.takeIf {
-                    it.matches(
-                        Regex("^\\d{15}$"),
-                    )
-                }
+                ?.takeIf { it.matches(Regex("^\\d{15}$")) }
         } catch (_: SecurityException) {
             null
         } catch (_: Exception) {
@@ -182,13 +117,3 @@ class DeviceInfoProvider(
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
