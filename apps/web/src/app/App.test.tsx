@@ -10,6 +10,7 @@ test('renders the Hive product identity', async () => {
     </MemoryRouter>,
   )
 
-  expect(await screen.findByRole('heading', { name: 'Hive' })).toBeInTheDocument()
-  expect(screen.getByText('The operating layer for event devices.')).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Sign in to Hive' })).toBeInTheDocument()
+  expect(screen.getByText('Hive')).toBeInTheDocument()
+  expect(screen.getByText('Blackbird Device Operations')).toBeInTheDocument()
 })
