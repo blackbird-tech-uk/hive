@@ -1,4 +1,4 @@
-import { Search, X } from 'lucide-react'
+import { LockKeyhole, Search, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../app/AuthContext'
@@ -6,11 +6,18 @@ import { StatCard } from '../components/dashboard/StatCard'
 import { DeviceDetails } from '../components/devices/DeviceDetails'
 import { DeviceTable } from '../components/devices/DeviceTable'
 import { TopBar } from '../components/layout/TopBar'
-import { getDevices, restoreAuthSession, type Device } from '../lib/api'
+import { createDeviceCommand, getDevices, restoreAuthSession, type Device } from '../lib/api'
 import { connectToDeviceUpdates, type RealtimeConnectionStatus } from '../lib/realtime'
 
 const DEVICE_ONLINE_THRESHOLD_MS = 20 * 60 * 1_000
 const LOW_BATTERY_THRESHOLD = 20
+
+type BulkActionResult = {
+  queued: number
+  failed: number
+  offline: number
+  unsupported: number
+}
 
 function normaliseSearchValue(value: string | null | undefined): string {
   return value?.toLowerCase().trim() ?? ''
@@ -38,13 +45,12 @@ export function DevicesPage() {
   const [error, setError] = useState<string | null>(null)
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeConnectionStatus>('disconnected')
   const [currentTime, setCurrentTime] = useState(() => new Date().getTime())
+  const [bulkActionRunning, setBulkActionRunning] = useState(false)
+  const [bulkActionResult, setBulkActionResult] = useState<BulkActionResult | null>(null)
 
   const loadDevices = useCallback(async (showInitialLoader = false) => {
-    if (showInitialLoader) {
-      setLoading(true)
-    } else {
-      setRefreshing(true)
-    }
+    if (showInitialLoader) setLoading(true)
+    else setRefreshing(true)
 
     try {
       const response = await getDevices()
@@ -111,25 +117,56 @@ export function DevicesPage() {
     })
   }, [devices, searchQuery, currentTime])
 
-  const toggleDevice = (deviceId: string) => setSelectedDeviceIds((current) => {
-    const next = new Set(current)
-    if (next.has(deviceId)) next.delete(deviceId)
-    else next.add(deviceId)
-    return next
-  })
+  const selectedDevices = useMemo(() => devices.filter((device) => selectedDeviceIds.has(device.id)), [devices, selectedDeviceIds])
+  const selectedOnline = selectedDevices.filter((device) => isDeviceOnline(device, currentTime)).length
+  const selectedLowBattery = selectedDevices.filter(isLowBattery).length
+  const lockEligibleDevices = selectedDevices.filter((device) => isDeviceOnline(device, currentTime) && device.supports_device_lock)
 
-  const toggleAllVisible = () => setSelectedDeviceIds((current) => {
-    const next = new Set(current)
-    const allVisibleSelected = filteredDevices.length > 0 && filteredDevices.every((device) => next.has(device.id))
-    filteredDevices.forEach((device) => {
-      if (allVisibleSelected) next.delete(device.id)
-      else next.add(device.id)
+  const toggleDevice = (deviceId: string) => {
+    setBulkActionResult(null)
+    setSelectedDeviceIds((current) => {
+      const next = new Set(current)
+      if (next.has(deviceId)) next.delete(deviceId)
+      else next.add(deviceId)
+      return next
     })
-    return next
-  })
+  }
 
-  const selectedOnline = devices.filter((device) => selectedDeviceIds.has(device.id) && isDeviceOnline(device, currentTime)).length
-  const selectedLowBattery = devices.filter((device) => selectedDeviceIds.has(device.id) && isLowBattery(device)).length
+  const toggleAllVisible = () => {
+    setBulkActionResult(null)
+    setSelectedDeviceIds((current) => {
+      const next = new Set(current)
+      const allVisibleSelected = filteredDevices.length > 0 && filteredDevices.every((device) => next.has(device.id))
+      filteredDevices.forEach((device) => {
+        if (allVisibleSelected) next.delete(device.id)
+        else next.add(device.id)
+      })
+      return next
+    })
+  }
+
+  async function lockSelectedDevices() {
+    if (lockEligibleDevices.length === 0 || bulkActionRunning) return
+
+    const offline = selectedDevices.filter((device) => !isDeviceOnline(device, currentTime)).length
+    const unsupported = selectedDevices.filter((device) => isDeviceOnline(device, currentTime) && !device.supports_device_lock).length
+    const confirmed = window.confirm(
+      `Lock ${lockEligibleDevices.length} selected scanner${lockEligibleDevices.length === 1 ? '' : 's'} now?${offline ? ` ${offline} offline scanner${offline === 1 ? '' : 's'} will be skipped.` : ''}${unsupported ? ` ${unsupported} unsupported scanner${unsupported === 1 ? '' : 's'} will be skipped.` : ''}`,
+    )
+    if (!confirmed) return
+
+    setBulkActionRunning(true)
+    setBulkActionResult(null)
+
+    const results = await Promise.allSettled(
+      lockEligibleDevices.map((device) => createDeviceCommand(device.id, { command: 'LOCK_DEVICE' })),
+    )
+    const queued = results.filter((result) => result.status === 'fulfilled').length
+    const failed = results.length - queued
+
+    setBulkActionResult({ queued, failed, offline, unsupported })
+    setBulkActionRunning(false)
+  }
 
   return (
     <>
@@ -156,9 +193,16 @@ export function DevicesPage() {
 
         {selectedDeviceIds.size > 0 && (
           <div className="fleet-selection-toolbar">
-            <div><strong>{selectedDeviceIds.size} selected</strong><span>{selectedOnline} online · {selectedDeviceIds.size - selectedOnline} offline · {selectedLowBattery} low battery</span></div>
-            <div className="fleet-selection-actions"><button className="secondary-button" onClick={() => setSelectedDeviceIds(new Set())} type="button">Clear selection</button></div>
+            <div><strong>{selectedDeviceIds.size} selected</strong><span>{selectedOnline} online · {selectedDeviceIds.size - selectedOnline} offline · {selectedLowBattery} low battery · {lockEligibleDevices.length} lock ready</span></div>
+            <div className="fleet-selection-actions">
+              <button className="primary-button" disabled={lockEligibleDevices.length === 0 || bulkActionRunning} onClick={() => void lockSelectedDevices()} type="button"><LockKeyhole aria-hidden="true" size={16} />{bulkActionRunning ? 'Queuing…' : `Lock selected (${lockEligibleDevices.length})`}</button>
+              <button className="secondary-button" disabled={bulkActionRunning} onClick={() => { setSelectedDeviceIds(new Set()); setBulkActionResult(null) }} type="button">Clear selection</button>
+            </div>
           </div>
+        )}
+
+        {bulkActionResult && (
+          <div className="dashboard-alert" role="status"><strong>Bulk lock finished</strong><span>{bulkActionResult.queued} queued · {bulkActionResult.failed} failed · {bulkActionResult.offline} offline skipped · {bulkActionResult.unsupported} unsupported skipped</span></div>
         )}
 
         {loading && devices.length === 0 ? (
