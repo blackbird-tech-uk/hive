@@ -16,6 +16,9 @@ const ONLINE_THRESHOLD_MS = 20 * 60 * 1_000
 interface DeviceTableProps {
   devices: Device[]
   onSelectDevice: (device: Device) => void
+  selectedDeviceIds?: Set<string>
+  onToggleDevice?: (deviceId: string) => void
+  onToggleAll?: () => void
 }
 
 function formatLabel(value: string): string {
@@ -26,119 +29,73 @@ function formatLabel(value: string): string {
 }
 
 function isDeviceOnline(device: Device): boolean {
-  if (!device.last_seen_at) {
-    return false
-  }
-
+  if (!device.last_seen_at) return false
   const lastSeenTime = new Date(device.last_seen_at).getTime()
-
-  if (Number.isNaN(lastSeenTime)) {
-    return false
-  }
-
+  if (Number.isNaN(lastSeenTime)) return false
   return Date.now() - lastSeenTime <= ONLINE_THRESHOLD_MS
 }
 
 function formatLastSeen(value: string | null): string {
-  if (!value) {
-    return 'Never'
-  }
-
+  if (!value) return 'Never'
   const timestamp = new Date(value).getTime()
-
-  if (Number.isNaN(timestamp)) {
-    return 'Unknown'
-  }
-
-  const differenceSeconds = Math.max(
-    0,
-    Math.floor((Date.now() - timestamp) / 1_000),
-  )
-
-  if (differenceSeconds < 10) {
-    return 'Just now'
-  }
-
-  if (differenceSeconds < 60) {
-    return `${differenceSeconds}s ago`
-  }
-
+  if (Number.isNaN(timestamp)) return 'Unknown'
+  const differenceSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1_000))
+  if (differenceSeconds < 10) return 'Just now'
+  if (differenceSeconds < 60) return `${differenceSeconds}s ago`
   const differenceMinutes = Math.floor(differenceSeconds / 60)
-
-  if (differenceMinutes < 60) {
-    return `${differenceMinutes}m ago`
-  }
-
+  if (differenceMinutes < 60) return `${differenceMinutes}m ago`
   const differenceHours = Math.floor(differenceMinutes / 60)
-
-  if (differenceHours < 24) {
-    return `${differenceHours}h ago`
-  }
-
-  const differenceDays = Math.floor(differenceHours / 24)
-
-  return `${differenceDays}d ago`
+  if (differenceHours < 24) return `${differenceHours}h ago`
+  return `${Math.floor(differenceHours / 24)}d ago`
 }
 
-function BatteryIcon({
-  level,
-  isCharging,
-}: {
-  level: number | null
-  isCharging: boolean | null
-}) {
-  if (isCharging) {
-    return <BatteryCharging size={17} aria-hidden="true" />
-  }
-
-  if (level === null) {
-    return <BatteryMedium size={17} aria-hidden="true" />
-  }
-
-  if (level <= 20) {
-    return <BatteryLow size={17} aria-hidden="true" />
-  }
-
-  if (level >= 80) {
-    return <BatteryFull size={17} aria-hidden="true" />
-  }
-
+function BatteryIcon({ level, isCharging }: { level: number | null; isCharging: boolean | null }) {
+  if (isCharging) return <BatteryCharging size={17} aria-hidden="true" />
+  if (level === null) return <BatteryMedium size={17} aria-hidden="true" />
+  if (level <= 20) return <BatteryLow size={17} aria-hidden="true" />
+  if (level >= 80) return <BatteryFull size={17} aria-hidden="true" />
   return <BatteryMedium size={17} aria-hidden="true" />
 }
 
 export function DeviceTable({
   devices,
   onSelectDevice,
+  selectedDeviceIds,
+  onToggleDevice,
+  onToggleAll,
 }: DeviceTableProps) {
+  const selectable = Boolean(selectedDeviceIds && onToggleDevice)
+  const allSelected = selectable && devices.length > 0 && devices.every((device) => selectedDeviceIds!.has(device.id))
+
   return (
     <div className="device-table-wrapper">
       <table className="device-table">
         <thead>
           <tr>
-            <th>Device</th>
-            <th>Connection</th>
-            <th>Battery</th>
-            <th>Network</th>
-            <th>IP address</th>
-            <th>Last seen</th>
-            <th>Status</th>
+            {selectable && (
+              <th className="device-selection-cell">
+                <input
+                  aria-label="Select all visible devices"
+                  checked={allSelected}
+                  onChange={() => onToggleAll?.()}
+                  type="checkbox"
+                />
+              </th>
+            )}
+            <th>Device</th><th>Connection</th><th>Battery</th><th>Network</th><th>IP address</th><th>Last seen</th><th>Status</th>
           </tr>
         </thead>
-
         <tbody>
           {devices.map((device) => {
             const online = isDeviceOnline(device)
-
+            const selected = selectedDeviceIds?.has(device.id) ?? false
             return (
               <tr
-                className="device-table-row"
+                className={`device-table-row${selected ? ' device-table-row--selected' : ''}`}
                 key={device.id}
                 onClick={() => onSelectDevice(device)}
                 onKeyDown={(event) => {
-                  if (
-                    event.key === 'Enter' ||
-                    event.key === ' '
-                  ) {
+                  if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
                     onSelectDevice(device)
                   }
@@ -146,104 +103,23 @@ export function DeviceTable({
                 role="button"
                 tabIndex={0}
               >
-                <td>
-                  <div className="device-identity">
-                    <div className="device-icon">
-                      <Radio size={17} aria-hidden="true" />
-                    </div>
-
-                    <div>
-                      <strong>{device.hive_id}</strong>
-
-                      <span>
-                        {device.asset_id ||
-                          device.serial_number ||
-                          'No asset recorded'}
-                      </span>
-
-                      <small>
-                        {device.model ?? 'Unknown model'}
-                      </small>
-                    </div>
-                  </div>
-                </td>
-
-                <td>
-                  <span
-                    className={`connection-status ${
-                      online
-                        ? 'connection-status-online'
-                        : 'connection-status-offline'
-                    }`}
-                  >
-                    {online ? (
-                      <Radio size={15} aria-hidden="true" />
-                    ) : (
-                      <CircleOff size={15} aria-hidden="true" />
-                    )}
-
-                    {online ? 'Online' : 'Offline'}
-                  </span>
-                </td>
-
-                <td>
-                  <div className="device-battery">
-                    <BatteryIcon
-                      level={device.battery_level}
-                      isCharging={device.is_charging}
+                {selectable && (
+                  <td className="device-selection-cell" onClick={(event) => event.stopPropagation()}>
+                    <input
+                      aria-label={`Select ${device.hive_id}`}
+                      checked={selected}
+                      onChange={() => onToggleDevice?.(device.id)}
+                      type="checkbox"
                     />
-
-                    <span>
-                      {device.battery_level !== null
-                        ? `${device.battery_level}%`
-                        : 'Unknown'}
-                    </span>
-
-                    {device.is_charging && (
-                      <small>Charging</small>
-                    )}
-                  </div>
-                </td>
-
-                <td>
-                  <div className="device-network">
-                    <Wifi size={16} aria-hidden="true" />
-
-                    <span>
-                      {device.wifi_ssid ?? 'Unknown network'}
-                    </span>
-                  </div>
-                </td>
-
-                <td>
-                  <code>
-                    {device.ip_address ?? 'Not reported'}
-                  </code>
-                </td>
-
-                <td>
-                  <div className="device-last-seen">
-                    <strong>
-                      {formatLastSeen(device.last_seen_at)}
-                    </strong>
-
-                    <span>
-                      {device.last_seen_at
-                        ? new Date(
-                            device.last_seen_at,
-                          ).toLocaleString('en-GB')
-                        : 'No heartbeat received'}
-                    </span>
-                  </div>
-                </td>
-
-                <td>
-                  <StatusBadge status={device.status} />
-
-                  <span className="badge subtle-badge">
-                    {formatLabel(device.condition)}
-                  </span>
-                </td>
+                  </td>
+                )}
+                <td><div className="device-identity"><div className="device-icon"><Radio size={17} aria-hidden="true" /></div><div><strong>{device.hive_id}</strong><span>{device.asset_id || device.serial_number || 'No asset recorded'}</span><small>{device.model ?? 'Unknown model'}</small></div></div></td>
+                <td><span className={`connection-status ${online ? 'connection-status-online' : 'connection-status-offline'}`}>{online ? <Radio size={15} aria-hidden="true" /> : <CircleOff size={15} aria-hidden="true" />}{online ? 'Online' : 'Offline'}</span></td>
+                <td><div className="device-battery"><BatteryIcon level={device.battery_level} isCharging={device.is_charging} /><span>{device.battery_level !== null ? `${device.battery_level}%` : 'Unknown'}</span>{device.is_charging && <small>Charging</small>}</div></td>
+                <td><div className="device-network"><Wifi size={16} aria-hidden="true" /><span>{device.wifi_ssid ?? 'Unknown network'}</span></div></td>
+                <td><code>{device.ip_address ?? 'Not reported'}</code></td>
+                <td><div className="device-last-seen"><strong>{formatLastSeen(device.last_seen_at)}</strong><span>{device.last_seen_at ? new Date(device.last_seen_at).toLocaleString('en-GB') : 'No heartbeat received'}</span></div></td>
+                <td><StatusBadge status={device.status} /><span className="badge subtle-badge">{formatLabel(device.condition)}</span></td>
               </tr>
             )
           })}
