@@ -7,22 +7,10 @@ import { DeviceDetails } from '../components/devices/DeviceDetails'
 import { DeviceTable } from '../components/devices/DeviceTable'
 import { TopBar } from '../components/layout/TopBar'
 import { createDeviceCommand, getDevices, restoreAuthSession, type Device } from '../lib/api'
+import { isDeviceOnline, isLowBattery, matchesDeviceSearch, matchesFleetFilter, needsAttention, type FleetFilter } from '../lib/fleet'
 import { connectToDeviceUpdates, type RealtimeConnectionStatus } from '../lib/realtime'
 
-const DEVICE_ONLINE_THRESHOLD_MS = 20 * 60 * 1_000
-const LOW_BATTERY_THRESHOLD = 20
-
-type FleetFilter = 'all' | 'online' | 'offline' | 'low_battery' | 'attention'
 type BulkActionResult = { action: string; queued: number; failed: number; offline: number; unsupported: number }
-
-function normaliseSearchValue(value: string | null | undefined): string { return value?.toLowerCase().trim() ?? '' }
-function isDeviceOnline(device: Device, currentTime: number): boolean {
-  if (!device.last_seen_at) return false
-  const lastSeenTime = new Date(device.last_seen_at).getTime()
-  return !Number.isNaN(lastSeenTime) && currentTime - lastSeenTime <= DEVICE_ONLINE_THRESHOLD_MS
-}
-function isLowBattery(device: Device): boolean { return device.battery_level !== null && device.battery_level !== undefined && device.battery_level <= LOW_BATTERY_THRESHOLD && device.is_charging !== true }
-function needsAttention(device: Device, currentTime: number): boolean { return !isDeviceOnline(device, currentTime) || isLowBattery(device) || device.condition.toLowerCase() !== 'good' }
 
 export function DevicesPage() {
   const { activeOrganization } = useAuth()
@@ -68,16 +56,7 @@ export function DevicesPage() {
   const lowBatteryDevices = useMemo(() => devices.filter(isLowBattery).length, [devices])
   const attentionDevices = useMemo(() => devices.filter((device) => needsAttention(device, currentTime)).length, [devices, currentTime])
 
-  const filteredDevices = useMemo(() => {
-    const query = normaliseSearchValue(searchQuery)
-    return devices.filter((device) => {
-      const online = isDeviceOnline(device, currentTime)
-      const matchesFilter = fleetFilter === 'all' || (fleetFilter === 'online' && online) || (fleetFilter === 'offline' && !online) || (fleetFilter === 'low_battery' && isLowBattery(device)) || (fleetFilter === 'attention' && needsAttention(device, currentTime))
-      if (!matchesFilter) return false
-      if (!query) return true
-      return [device.hive_id, device.asset_id, device.serial_number, device.imei, device.manufacturer, device.model, device.android_version, device.build_version, device.agent_version, device.wifi_ssid, device.ip_address, device.status, device.condition, device.notes, online ? 'online' : 'offline'].some((value) => normaliseSearchValue(value).includes(query))
-    })
-  }, [devices, searchQuery, currentTime, fleetFilter])
+  const filteredDevices = useMemo(() => devices.filter((device) => matchesFleetFilter(device, fleetFilter, currentTime) && matchesDeviceSearch(device, searchQuery, currentTime)), [devices, searchQuery, currentTime, fleetFilter])
 
   const selectedDevices = useMemo(() => devices.filter((device) => selectedDeviceIds.has(device.id)), [devices, selectedDeviceIds])
   const selectedOnline = selectedDevices.filter((device) => isDeviceOnline(device, currentTime)).length
