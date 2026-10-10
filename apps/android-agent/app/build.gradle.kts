@@ -5,6 +5,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val hiveApiBaseUrl =
+    providers.gradleProperty("hiveApiBaseUrl")
+        .orElse(providers.environmentVariable("HIVE_API_BASE_URL"))
+        .orElse("http://10.0.2.2:8000/api/v1")
+        .get()
+
 android {
     namespace = "com.blackbird.hiveagent"
     compileSdk = 35
@@ -19,7 +25,7 @@ android {
         buildConfigField(
             "String",
             "API_BASE_URL",
-            "\"http://192.168.0.12:8000/api/v1\"",
+            "\"$hiveApiBaseUrl\"",
         )
     }
 
