@@ -44,21 +44,27 @@ def upgrade() -> None:
     ).scalar_one_or_none()
 
     if blackbird_organization_id is None:
-        # A fresh Hive database has no organization rows yet. Device ownership
-        # is established after the Alpha bootstrap creates Blackbird. With no
-        # legacy devices there is nothing to backfill during this migration.
-        existing_device_count = bind.execute(
-            sa.text("SELECT COUNT(*) FROM devices")
+        # Fresh installations have no bootstrap data yet. Seed the tenant that
+        # this historical migration requires; bootstrap_alpha will reuse it.
+        blackbird_organization_id = bind.execute(
+            sa.text(
+                """
+                INSERT INTO organizations (
+                    id, name, slug, status, created_at, updated_at
+                )
+                VALUES (
+                    gen_random_uuid(), :name, :slug, :status,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+                RETURNING id
+                """
+            ),
+            {
+                "name": "Blackbird",
+                "slug": "blackbird",
+                "status": "active",
+            },
         ).scalar_one()
-
-        if existing_device_count:
-            raise RuntimeError(
-                "The Blackbird organization must exist before existing "
-                "devices can be assigned."
-            )
-
-        op.drop_column("devices", "organization_id")
-        return
 
     bind.execute(
         sa.text(
