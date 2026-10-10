@@ -12,6 +12,7 @@ import { AppShell } from '../components/layout/AppShell'
 import { DashboardPage } from '../pages/Dashboard'
 import { DeviceDashboardPage } from '../pages/DeviceDashboard'
 import { DevicesPage } from '../pages/Devices'
+import { FleetMapPage } from '../pages/FleetMap'
 import { EnrollmentsPage } from '../pages/Enrollments'
 import { LoginPage } from '../pages/Login'
 
@@ -91,6 +92,11 @@ function ProtectedApplication() {
         <Route
           path="/devices"
           element={<DevicesPage />}
+        />
+
+        <Route
+          path="/map"
+          element={<FleetMapPage />}
         />
 
 <Route
