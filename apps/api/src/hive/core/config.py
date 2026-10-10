@@ -37,7 +37,11 @@ class Settings(BaseSettings):
                 "JWT_SECRET_KEY must be set to a unique secret in production."
             )
 
-        if "localhost" in self.database_url or "hive_local_password" in self.database_url:
+        unsafe_database = (
+            "localhost" in self.database_url
+            or "hive_local_password" in self.database_url
+        )
+        if unsafe_database:
             raise ValueError(
                 "DATABASE_URL must point to the production database."
             )
