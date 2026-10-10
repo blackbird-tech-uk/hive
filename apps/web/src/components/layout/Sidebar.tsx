@@ -3,6 +3,7 @@ import {
   CalendarDays,
   LayoutDashboard,
   Radio,
+  MapPinned,
   Settings,
   Wrench,
 } from "lucide-react";
@@ -11,6 +12,7 @@ import { NavLink } from "react-router-dom";
 const navigationItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Devices", icon: Radio, path: "/devices" },
+  { label: "Map", icon: MapPinned, path: "/map" },
   { label: "Events", icon: CalendarDays, path: "/events" },
   { label: "Inventory", icon: Box, path: "/inventory" },
   { label: "Repairs", icon: Wrench, path: "/repairs" },
