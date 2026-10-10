@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     )
 
     cors_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:5173"]
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "https://hive-web-zeta.vercel.app",
+        ]
     )
 
     jwt_secret_key: str = DEVELOPMENT_JWT_SECRET
