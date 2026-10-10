@@ -10,7 +10,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hive} -d ${POSTGRES_DB:-hive}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-hive} -d ${POSTGRES_DB:-hive}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -18,11 +22,21 @@ services:
   api:
     build:
       context: ./apps/api
+    command: >
+      uvicorn hive.main:app
+      --host 0.0.0.0
+      --port 8000
+      --app-dir /app/src
     environment:
+      PYTHONPATH: /app/src
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://hive:hive_local_password@postgres:5432/hive}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       API_HOST: 0.0.0.0
       API_PORT: 8000
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:5175"]'
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-replace-this-with-a-long-development-secret-key-123456789}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-60}
     ports:
       - "8000:8000"
     volumes:
@@ -30,7 +44,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: uvicorn hive.main:app --host 0.0.0.0 --port 8000 --reload
 
   web:
     build:

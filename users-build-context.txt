@@ -1,0 +1,451 @@
+===== db/base.py =====
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    """Base class for all SQLAlchemy models."""
+
+===== api/v1/router.py =====
+from fastapi import APIRouter
+
+from hive.api.v1.routes_health import router as health_router
+from hive.modules.assignments.router import router as assignments_router
+from hive.modules.devices.router import router as devices_router
+from hive.modules.events.router import router as events_router
+
+api_router = APIRouter()
+
+api_router.include_router(health_router, tags=["system"])
+api_router.include_router(devices_router)
+api_router.include_router(events_router)
+api_router.include_router(assignments_router)
+
+===== devices/models.py =====
+from __future__ import annotations
+
+import enum
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, Enum, String, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from hive.db.base import Base
+
+
+def utc_now() -> datetime:
+    """Return the current UTC time as a timezone-aware datetime."""
+    return datetime.now(timezone.utc)
+
+
+class DeviceStatus(str, enum.Enum):
+    AVAILABLE = "available"
+    ASSIGNED = "assigned"
+    IN_USE = "in_use"
+    REPAIR = "repair"
+    RETIRED = "retired"
+
+
+class DeviceCondition(str, enum.Enum):
+    EXCELLENT = "excellent"
+    GOOD = "good"
+    FAIR = "fair"
+    POOR = "poor"
+
+
+class Device(Base):
+    """A physical Android device managed by Hive."""
+
+    __tablename__ = "devices"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    hive_id: Mapped[str] = mapped_column(
+        String(20),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    asset_id: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    serial_number: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    imei: Mapped[str | None] = mapped_column(
+        String(15),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+
+    model: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        default="Unitech EA660",
+    )
+
+    android_version: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    build_version: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    status: Mapped[DeviceStatus] = mapped_column(
+        Enum(DeviceStatus, name="device_status"),
+        nullable=False,
+        default=DeviceStatus.AVAILABLE,
+    )
+
+    condition: Mapped[DeviceCondition] = mapped_column(
+        Enum(DeviceCondition, name="device_condition"),
+        nullable=False,
+        default=DeviceCondition.GOOD,
+    )
+
+    notes: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
+===== devices/router.py =====
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from hive.db.session import get_db
+from uuid import UUID
+
+from hive.modules.devices.schemas import (
+    DeviceCreate,
+    DeviceResponse,
+    DeviceUpdate,
+)
+
+from hive.modules.devices.service import (
+    DeviceAlreadyExistsError,
+    DeviceNotFoundError,
+    DeviceService,
+)
+
+router = APIRouter(
+    prefix="/devices",
+    tags=["Devices"],
+)
+
+DatabaseSession = Annotated[Session, Depends(get_db)]
+
+
+@router.post(
+    "",
+    response_model=DeviceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_device(
+    payload: DeviceCreate,
+    db: DatabaseSession,
+) -> DeviceResponse:
+    """Register a new device in Hive."""
+    service = DeviceService(db)
+
+    try:
+        return service.create_device(payload)
+    except DeviceAlreadyExistsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "",
+    response_model=list[DeviceResponse],
+)
+def list_devices(db: DatabaseSession) -> list[DeviceResponse]:
+    """Return all devices registered in Hive."""
+    service = DeviceService(db)
+    return list(service.list_devices())
+
+
+@router.patch(
+    "/{device_id}",
+    response_model=DeviceResponse,
+)
+def update_device(
+    device_id: UUID,
+    payload: DeviceUpdate,
+    db: DatabaseSession,
+) -> DeviceResponse:
+    """Update an existing device."""
+    service = DeviceService(db)
+
+    try:
+        return service.update_device(device_id, payload)
+    except DeviceNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except DeviceAlreadyExistsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+===== devices/repository.py =====
+from __future__ import annotations
+
+import uuid
+from collections.abc import Sequence
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from hive.modules.devices.models import Device
+
+
+class DeviceRepository:
+    """Database access for Hive-managed devices."""
+
+    def __init__(self, db: Session) -> None:
+        self.db = db
+
+    def add(self, device: Device) -> Device:
+        self.db.add(device)
+        self.db.flush()
+        return device
+
+    def get_by_id(self, device_id: uuid.UUID) -> Device | None:
+        return self.db.scalar(
+            select(Device).where(Device.id == device_id)
+        )
+
+    def get_by_asset_id(self, asset_id: str) -> Device | None:
+        return self.db.scalar(
+            select(Device).where(Device.asset_id == asset_id)
+        )
+
+    def get_by_serial_number(self, serial_number: str) -> Device | None:
+        return self.db.scalar(
+            select(Device).where(Device.serial_number == serial_number)
+        )
+
+    def get_by_imei(self, imei: str) -> Device | None:
+        return self.db.scalar(
+            select(Device).where(Device.imei == imei)
+        )
+
+    def list_all(self) -> Sequence[Device]:
+        return self.db.scalars(
+            select(Device).order_by(Device.created_at.desc())
+        ).all()
+
+===== devices/service.py =====
+from __future__ import annotations
+
+import secrets
+import uuid
+from collections.abc import Sequence
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from hive.modules.devices.models import Device
+from hive.modules.devices.repository import DeviceRepository
+from hive.modules.devices.schemas import DeviceCreate, DeviceUpdate
+
+
+class DeviceAlreadyExistsError(Exception):
+    """Raised when a unique device identifier already exists."""
+
+    def __init__(self, field: str, value: str) -> None:
+        self.field = field
+        self.value = value
+        super().__init__(f"A device with {field} '{value}' already exists.")
+
+
+class DeviceNotFoundError(Exception):
+    """Raised when a requested device cannot be found."""
+
+    def __init__(self, device_id: object) -> None:
+        super().__init__(f"Device '{device_id}' was not found.")
+
+
+class DeviceService:
+    """Business rules for registering and retrieving devices."""
+
+    def __init__(self, db: Session) -> None:
+        self.db = db
+        self.repository = DeviceRepository(db)
+
+    def create_device(self, payload: DeviceCreate) -> Device:
+        self._check_for_duplicates(payload)
+
+        device = Device(
+            hive_id=self._generate_hive_id(),
+            asset_id=payload.asset_id.strip(),
+            serial_number=payload.serial_number.strip(),
+            imei=payload.imei.strip() if payload.imei else None,
+            model=payload.model.strip(),
+            android_version=payload.android_version,
+            build_version=payload.build_version,
+            condition=payload.condition,
+            notes=payload.notes,
+        )
+
+        try:
+            self.repository.add(device)
+            self.db.commit()
+            self.db.refresh(device)
+        except IntegrityError:
+            self.db.rollback()
+            raise DeviceAlreadyExistsError(
+                "identifier",
+                "asset ID, serial number or IMEI",
+            ) from None
+
+        return device
+
+    def get_device(self, device_id: uuid.UUID) -> Device:
+        device = self.repository.get_by_id(device_id)
+
+        if device is None:
+            raise DeviceNotFoundError(device_id)
+
+        return device
+
+    def list_devices(self) -> Sequence[Device]:
+        return self.repository.list_all()
+
+    def update_device(
+        self,
+        device_id: uuid.UUID,
+        payload: DeviceUpdate,
+    ) -> Device:
+        device = self.get_device(device_id)
+        updates = payload.model_dump(exclude_unset=True)
+
+        if "asset_id" in updates:
+            new_asset_id = updates["asset_id"].strip()
+            existing = self.repository.get_by_asset_id(new_asset_id)
+
+            if existing is not None and existing.id != device.id:
+                raise DeviceAlreadyExistsError("asset_id", new_asset_id)
+
+            device.asset_id = new_asset_id
+
+        if "serial_number" in updates:
+            new_serial = updates["serial_number"].strip()
+            existing = self.repository.get_by_serial_number(new_serial)
+
+            if existing is not None and existing.id != device.id:
+                raise DeviceAlreadyExistsError("serial_number", new_serial)
+
+            device.serial_number = new_serial
+
+        if "imei" in updates:
+            new_imei = updates["imei"].strip() if updates["imei"] else None
+
+            if new_imei is not None:
+                existing = self.repository.get_by_imei(new_imei)
+
+                if existing is not None and existing.id != device.id:
+                    raise DeviceAlreadyExistsError("imei", new_imei)
+
+            device.imei = new_imei
+
+        if "model" in updates:
+            device.model = updates["model"].strip()
+
+        if "android_version" in updates:
+            device.android_version = updates["android_version"]
+
+        if "build_version" in updates:
+            device.build_version = updates["build_version"]
+
+        if "status" in updates:
+            device.status = updates["status"]
+
+        if "condition" in updates:
+            device.condition = updates["condition"]
+
+        if "notes" in updates:
+            device.notes = updates["notes"]
+
+        try:
+            self.db.commit()
+            self.db.refresh(device)
+        except IntegrityError:
+            self.db.rollback()
+            raise DeviceAlreadyExistsError(
+                "identifier",
+                "asset ID, serial number or IMEI",
+            ) from None
+
+        return device
+
+    def _check_for_duplicates(self, payload: DeviceCreate) -> None:
+        asset_id = payload.asset_id.strip()
+        serial_number = payload.serial_number.strip()
+
+        if self.repository.get_by_asset_id(asset_id):
+            raise DeviceAlreadyExistsError("asset_id", asset_id)
+
+        if self.repository.get_by_serial_number(serial_number):
+            raise DeviceAlreadyExistsError(
+                "serial_number",
+                serial_number,
+            )
+
+        if payload.imei:
+            imei = payload.imei.strip()
+
+            if self.repository.get_by_imei(imei):
+                raise DeviceAlreadyExistsError("imei", imei)
+
+    def _generate_hive_id(self) -> str:
+        """Generate a readable unique Hive identifier."""
+        for _ in range(10):
+            candidate = f"HB-{secrets.token_hex(3).upper()}"
+
+            exists = self.db.scalar(
+                select(Device.id).where(Device.hive_id == candidate)
+            )
+
+            if not exists:
+                return candidate
+
+        raise RuntimeError("Unable to generate a unique Hive ID.")

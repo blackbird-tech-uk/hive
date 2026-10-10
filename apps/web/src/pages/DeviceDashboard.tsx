@@ -1,0 +1,1856 @@
+﻿import {
+  ArrowLeft,
+  BatteryCharging,
+  Bell,
+  Clock3,
+  MapPin,
+  MessageSquare,
+  Radio,
+  RefreshCw,
+  Smartphone,
+  Wifi,
+} from 'lucide-react'
+
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from 'react'
+import {
+  Link,
+  useParams,
+} from 'react-router-dom'
+
+import { ApplicationInventoryPanel } from '../components/devices/ApplicationInventoryPanel'
+import { StatusBadge } from '../components/devices/StatusBadge'
+import {
+  createDeviceCommand,
+  getDevice,
+  getDeviceCommands,
+  getDeviceApplications,
+  getDeviceLocationHistory,
+  type Device,
+  type DeviceCommand,
+  type DeviceLocation,
+  type InstalledApplication,
+} from '../lib/api'
+
+
+
+const DEVICE_ONLINE_THRESHOLD_MS =
+  20 * 60 * 1_000
+
+function isDeviceOnline(
+  device: Device,
+): boolean {
+  if (!device.last_seen_at) {
+    return false
+  }
+
+  const lastSeenTime = new Date(
+    device.last_seen_at,
+  ).getTime()
+
+  if (Number.isNaN(lastSeenTime)) {
+    return false
+  }
+
+  return (
+    Date.now() - lastSeenTime <=
+    DEVICE_ONLINE_THRESHOLD_MS
+  )
+}
+
+function formatManagementMode(
+  mode: string | null | undefined,
+): string {
+  switch (mode) {
+    case 'device_owner':
+      return 'Device Owner'
+    case 'device_admin':
+      return 'Device Admin'
+    default:
+      return 'Standard'
+  }
+}
+
+function formatRelativeTime(
+  value: string | null | undefined,
+): string {
+  if (!value) {
+    return 'Never reported'
+  }
+
+  const timestamp = new Date(value).getTime()
+
+  if (Number.isNaN(timestamp)) {
+    return 'Unknown'
+  }
+
+  const seconds = Math.max(
+    0,
+    Math.floor(
+      (Date.now() - timestamp) / 1000,
+    ),
+  )
+
+  if (seconds < 10) {
+    return 'Just now'
+  }
+
+  if (seconds < 60) {
+    return `${seconds} seconds ago`
+  }
+
+  const minutes = Math.floor(seconds / 60)
+
+  if (minutes < 60) {
+    return `${minutes} minute${
+      minutes === 1 ? '' : 's'
+    } ago`
+  }
+
+  const hours = Math.floor(minutes / 60)
+
+  if (hours < 24) {
+    return `${hours} hour${
+      hours === 1 ? '' : 's'
+    } ago`
+  }
+
+  const days = Math.floor(hours / 24)
+
+  return `${days} day${
+    days === 1 ? '' : 's'
+  } ago`
+}
+
+function formatDateTime(
+  value: string | null | undefined,
+): string {
+  if (!value) {
+    return 'Not available'
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown'
+  }
+
+  return new Intl.DateTimeFormat(
+    'en-GB',
+    {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    },
+  ).format(date)
+}
+
+function formatCommandName(
+  command: string,
+): string {
+  return command
+    .toLowerCase()
+    .split('_')
+    .map(
+      (part) =>
+        part.charAt(0).toUpperCase() +
+        part.slice(1),
+    )
+    .join(' ')
+}
+
+function getCommandActivityTime(
+  command: DeviceCommand,
+): string {
+  return (
+    command.completed_at ??
+    command.acknowledged_at ??
+    command.sent_at ??
+    command.created_at
+  )
+}
+
+export function DeviceDashboardPage() {
+const [activeTab, setActiveTab] =
+  useState<'overview' | 'activity' | 'applications'>(
+    'overview',
+  )
+
+  const { deviceId } = useParams<{
+    deviceId: string
+  }>()
+
+  const [device, setDevice] =
+    useState<Device | null>(null)
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [error, setError] = useState<
+    string | null
+  >(null)
+
+  const [sendingCommand, setSendingCommand] =
+    useState<string | null>(null)
+
+  const [commandNotice, setCommandNotice] =
+    useState<string | null>(null)
+
+  const [commandError, setCommandError] =
+    useState<string | null>(null)
+
+  const [messageComposerOpen, setMessageComposerOpen] =
+    useState(false)
+
+  const [messageTitle, setMessageTitle] =
+    useState('Hive message')
+
+  const [messageBody, setMessageBody] =
+    useState('')
+
+  const [applications, setApplications] =
+    useState<InstalledApplication[]>([])
+
+  const [applicationsLoading, setApplicationsLoading] =
+    useState(false)
+
+  const [applicationsError, setApplicationsError] =
+    useState<string | null>(null)
+
+  const [commands, setCommands] =
+  useState<DeviceCommand[]>([])
+
+const [commandsLoading, setCommandsLoading] =
+  useState(false)
+
+const [commandsError, setCommandsError] =
+  useState<string | null>(null)  
+
+    const [location, setLocation] =
+  useState<DeviceLocation | null>(null)
+
+const [locationLoading, setLocationLoading] =
+  useState(false)
+
+const [locationError, setLocationError] =
+  useState<string | null>(null)
+
+  const loadDevice = useCallback(
+  async () => {
+    if (!deviceId) {
+      setError(
+        'No device ID was provided.',
+      )
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      const loadedDevice =
+        await getDevice(deviceId)
+
+      setDevice(loadedDevice)
+      setError(null)
+    } catch (loadError) {
+      setDevice(null)
+
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load this device.',
+      )
+    } finally {
+      setLoading(false)
+    }
+  },
+  [deviceId],
+)
+  const loadCommands = useCallback(
+  async (showLoader = false) => {
+    if (!deviceId) {
+      return
+    }
+
+    const startedAt = Date.now()
+
+    if (showLoader) {
+      setCommandsLoading(true)
+    }
+
+    try {
+      const loadedCommands =
+        await getDeviceCommands(deviceId)
+
+      setCommands(loadedCommands)
+      setCommandsError(null)
+    } catch (loadError) {
+      setCommandsError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load device activity.',
+      )
+    } finally {
+      if (showLoader) {
+        const elapsed = Date.now() - startedAt
+        const remaining = Math.max(
+          0,
+          500 - elapsed,
+        )
+
+        window.setTimeout(() => {
+          setCommandsLoading(false)
+        }, remaining)
+      }
+    }
+  },
+  [deviceId],
+)
+
+const loadLocation = useCallback(
+  async (showLoader = false) => {
+    if (!deviceId) {
+      return
+    }
+
+    if (showLoader) {
+      setLocationLoading(true)
+    }
+
+    try {
+      const locations =
+        await getDeviceLocationHistory(
+          deviceId,
+          1,
+        )
+
+      setLocation(locations[0] ?? null)
+      setLocationError(null)
+    } catch (loadError) {
+      setLocation(null)
+
+      setLocationError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unable to load device location.',
+      )
+    } finally {
+      setLocationLoading(false)
+    }
+  },
+  [deviceId],
+)
+
+        const sendCommand = useCallback(
+  async (
+    command: string,
+    payload: Record<string, unknown> = {},
+  ) => {
+    if (!deviceId) {
+      return
+    }
+
+    try {
+      setSendingCommand(command)
+      setCommandNotice(null)
+      setCommandError(null)
+
+      const createdCommand =
+        await createDeviceCommand(deviceId, {
+          command,
+          payload,
+        })
+
+      setCommands((currentCommands) => [
+        createdCommand,
+        ...currentCommands.filter(
+          (existingCommand) =>
+            existingCommand.id !==
+            createdCommand.id,
+        ),
+      ])
+
+      if (command === 'REQUEST_LOCATION') {
+        window.setTimeout(() => {
+          void loadLocation()
+        }, 2_000)
+      }
+
+      setCommandNotice(
+        `${formatCommandName(
+          command,
+        )} command queued successfully.`,
+      )
+    } catch (sendError) {
+      setCommandError(
+        sendError instanceof Error
+          ? sendError.message
+          : 'Unable to send the device command.',
+      )
+    } finally {
+      setSendingCommand(null)
+    }
+  },
+  [deviceId, loadLocation],
+)
+
+  const handleSendMessage = useCallback(
+    async () => {
+      const cleanMessage = messageBody.trim()
+
+      if (!cleanMessage) {
+        setCommandNotice(null)
+        setCommandError(
+          'Enter a message before sending.',
+        )
+        return
+      }
+
+      await sendCommand(
+        'SHOW_MESSAGE',
+        {
+          title:
+            messageTitle.trim() ||
+            'Hive message',
+          message: cleanMessage,
+        },
+      )
+
+      setMessageComposerOpen(false)
+      setMessageBody('')
+    },
+    [
+      messageBody,
+      messageTitle,
+      sendCommand,
+    ],
+  )
+
+  const loadApplications = useCallback(
+    async (showLoading = false) => {
+      if (!deviceId) {
+        return
+      }
+
+      try {
+        if (showLoading) {
+          setApplicationsLoading(true)
+        }
+
+        setApplicationsError(null)
+
+        const installedApplications =
+          await getDeviceApplications(deviceId)
+
+        setApplications(installedApplications)
+      } catch (loadError) {
+        setApplicationsError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Unable to load installed applications.',
+        )
+      } finally {
+        if (showLoading) {
+          setApplicationsLoading(false)
+        }
+      }
+    },
+    [deviceId],
+  )
+
+  const handleRefreshApps = useCallback(
+    async () => {
+      await sendCommand('REFRESH_APPS')
+
+      window.setTimeout(() => {
+        void loadApplications()
+      }, 3_000)
+
+      window.setTimeout(() => {
+        void loadApplications()
+      }, 8_000)
+    },
+    [loadApplications, sendCommand],
+  )
+  const handleApplicationCommand = useCallback(
+    async (
+      command:
+        | 'LAUNCH_APP'
+        | 'FORCE_STOP_APP'
+        | 'UNINSTALL_APP',
+      application: InstalledApplication,
+    ) => {
+      await sendCommand(command, {
+        package_name: application.package_name,
+        app_name: application.app_name,
+      })
+
+      if (command === 'UNINSTALL_APP') {
+        window.setTimeout(() => {
+          void loadApplications()
+        }, 12_000)
+      }
+    },
+    [loadApplications, sendCommand],
+  )
+
+useEffect(() => {
+  void loadDevice()
+  void loadLocation(true)
+  void loadCommands(true)
+  void loadApplications(true)
+}, [
+  loadCommands,
+  loadDevice,
+  loadLocation,
+  loadApplications,
+])
+
+useEffect(() => {
+  const commandPoll = window.setInterval(
+    () => {
+      void loadCommands()
+    },
+    5_000,
+  )
+
+  return () => {
+    window.clearInterval(commandPoll)
+  }
+}, [loadCommands])
+
+  if (loading) {
+    return (
+      <section className="device-dashboard-state">
+        <div className="device-dashboard-loader" />
+
+        <h1>Loading device</h1>
+
+        <p>
+          Retrieving device information from
+          Hive.
+        </p>
+      </section>
+    )
+  }
+
+  if (error || !device) {
+    return (
+      <section className="device-dashboard-state">
+        <Smartphone
+          aria-hidden="true"
+          size={42}
+        />
+
+        <h1>Device unavailable</h1>
+
+        <p>
+          {error ??
+            'This device could not be found.'}
+        </p>
+
+        <Link
+          className="primary-button"
+          to="/devices"
+        >
+          Back to devices
+        </Link>
+      </section>
+    )
+  }
+
+  const online = isDeviceOnline(device)
+
+  return (
+    <section className="device-dashboard-page">
+      <Link
+        className="device-dashboard-back"
+        to="/devices"
+      >
+        <ArrowLeft
+          aria-hidden="true"
+          size={17}
+        />
+
+        Back to devices
+      </Link>
+
+      <header className="device-dashboard-header">
+        <div className="device-dashboard-identity">
+          <div className="device-dashboard-icon">
+            <Smartphone
+              aria-hidden="true"
+              size={28}
+            />
+          </div>
+
+          <div>
+            <p className="eyebrow">
+              DEVICE MANAGEMENT
+            </p>
+
+            <h1>
+              {device.asset_id ||
+                device.hive_id ||
+                'Unnamed device'}
+            </h1>
+
+            <div className="device-dashboard-subtitle">
+              <span>
+                {device.manufacturer ??
+                  'Unknown manufacturer'}
+              </span>
+
+              <span aria-hidden="true">
+                â€¢
+              </span>
+
+              <span>
+                {device.model ??
+                  'Unknown model'}
+              </span>
+
+              {device.hive_id ? (
+                <>
+                  <span aria-hidden="true">
+                    â€¢
+                  </span>
+
+                  <code>
+                    {device.hive_id}
+                  </code>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="device-dashboard-header-status">
+          <span
+            className={
+              online
+                ? 'device-live-status device-live-status-online'
+                : 'device-live-status device-live-status-offline'
+            }
+          >
+            <span />
+
+            {online ? 'Online' : 'Offline'}
+          </span>
+
+          <StatusBadge
+            status={device.status}
+          />
+        </div>
+      </header>
+
+      <section
+        aria-label="Device quick actions"
+        className="device-dashboard-actions"
+      >
+        <div className="device-dashboard-actions-heading">
+          <div>
+            <p className="eyebrow">
+              REMOTE MANAGEMENT
+            </p>
+
+            <h2>Quick actions</h2>
+          </div>
+
+          <span>
+            Commands are securely queued for the
+            Android agent.
+          </span>
+        </div>
+
+        <div className="device-dashboard-action-grid">
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() =>
+              void sendCommand('PING')
+            }
+            type="button"
+          >
+            <Radio
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand === 'PING'
+                  ? 'Queuing...'
+                  : 'Ping'}
+              </strong>
+
+              <small>
+                Test agent connectivity
+              </small>
+            </span>
+          </button>
+
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() =>
+              void sendCommand('RING')
+            }
+            type="button"
+          >
+            <Bell
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand === 'RING'
+                  ? 'Queuing...'
+                  : 'Ring device'}
+              </strong>
+
+              <small>
+                Play an audible alert
+              </small>
+            </span>
+          </button>
+
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() =>
+              void sendCommand(
+                'REQUEST_LOCATION',
+              )
+            }
+            type="button"
+          >
+            <MapPin
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand ===
+                'REQUEST_LOCATION'
+                  ? 'Queuing...'
+                  : 'Locate'}
+              </strong>
+
+              <small>
+                Request current location
+              </small>
+            </span>
+          </button>
+
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() => {
+              setCommandError(null)
+              setCommandNotice(null)
+              setMessageComposerOpen(true)
+            }}
+            type="button"
+          >
+            <MessageSquare
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand === 'SHOW_MESSAGE'
+                  ? 'Queuing...'
+                  : 'Message'}
+              </strong>
+
+              <small>
+                Display a device message
+              </small>
+            </span>
+          </button>
+
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() =>
+              void handleRefreshApps()
+            }
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand === 'REFRESH_APPS'
+                  ? 'Queuing...'
+                  : 'Refresh apps'}
+              </strong>
+
+              <small>
+                Request installed app inventory
+              </small>
+            </span>
+          </button>
+
+
+          <button
+            className="device-dashboard-action"
+            disabled={
+              sendingCommand !== null ||
+              !device.supports_device_lock
+            }
+            onClick={() =>
+              void sendCommand('LOCK_DEVICE')
+            }
+            title={
+              device.supports_device_lock
+                ? 'Lock this managed device'
+                : 'Requires active Device Admin or Device Owner'
+            }
+            type="button"
+          >
+            <Smartphone
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>
+                {sendingCommand === 'LOCK_DEVICE'
+                  ? 'Queuing...'
+                  : 'Lock device'}
+              </strong>
+
+              <small>
+                {device.supports_device_lock
+                  ? 'Immediately lock the screen'
+                  : 'Requires Device Admin'}
+              </small>
+            </span>
+          </button>
+          <button
+            className="device-dashboard-action"
+            disabled={loading}
+            onClick={() =>
+              void loadDevice()
+            }
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              size={20}
+            />
+
+            <span>
+              <strong>Refresh telemetry</strong>
+
+              <small>
+                Reload device telemetry
+              </small>
+            </span>
+          </button>
+        </div>
+
+        {commandNotice && (
+          <p
+            className="device-dashboard-command-notice"
+            role="status"
+          >
+            {commandNotice}
+          </p>
+        )}
+
+        {commandError && (
+          <p
+            className="device-dashboard-command-error"
+            role="alert"
+          >
+            {commandError}
+          </p>
+        )}
+      </section>
+
+      {messageComposerOpen && (
+        <div
+          className="modal-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setMessageComposerOpen(false)
+            }
+          }}
+          role="presentation"
+        >
+          <section
+            aria-labelledby="device-message-title"
+            aria-modal="true"
+            className="modal"
+            role="dialog"
+          >
+            <header className="modal-header">
+              <div>
+                <p className="eyebrow">
+                  REMOTE MESSAGE
+                </p>
+
+                <h2 id="device-message-title">
+                  Send message to device
+                </h2>
+              </div>
+
+              <button
+                aria-label="Close message composer"
+                className="modal-close-button"
+                disabled={
+                  sendingCommand ===
+                  'SHOW_MESSAGE'
+                }
+                onClick={() =>
+                  setMessageComposerOpen(false)
+                }
+                type="button"
+              >
+                Ã—
+              </button>
+            </header>
+
+            <div className="event-form">
+              <label>
+                Title
+
+                <input
+                  disabled={
+                    sendingCommand ===
+                    'SHOW_MESSAGE'
+                  }
+                  maxLength={120}
+                  onChange={(event) =>
+                    setMessageTitle(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Hive message"
+                  type="text"
+                  value={messageTitle}
+                />
+              </label>
+
+              <label>
+                Message
+
+                <textarea
+                  autoFocus
+                  disabled={
+                    sendingCommand ===
+                    'SHOW_MESSAGE'
+                  }
+                  maxLength={1000}
+                  onChange={(event) =>
+                    setMessageBody(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Enter the message to display on the device..."
+                  rows={5}
+                  value={messageBody}
+                />
+              </label>
+            </div>
+
+            <footer className="modal-actions">
+              <button
+                className="secondary-button"
+                disabled={
+                  sendingCommand ===
+                  'SHOW_MESSAGE'
+                }
+                onClick={() =>
+                  setMessageComposerOpen(false)
+                }
+                type="button"
+              >
+                Cancel
+              </button>
+
+              <button
+                className="primary-button"
+                disabled={
+                  sendingCommand !== null ||
+                  !messageBody.trim()
+                }
+                onClick={() =>
+                  void handleSendMessage()
+                }
+                type="button"
+              >
+                {sendingCommand ===
+                'SHOW_MESSAGE'
+                  ? 'Sending...'
+                  : 'Send message'}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      <section
+        aria-label="Device summary"
+        className="device-dashboard-summary"
+      >
+        <article className="device-dashboard-summary-card">
+          <span className="device-dashboard-summary-icon">
+            <BatteryCharging
+              aria-hidden="true"
+              size={21}
+            />
+          </span>
+
+          <div>
+            <span>Battery</span>
+
+            <strong>
+              {device.battery_level !== null &&
+              device.battery_level !== undefined
+                ? `${device.battery_level}%`
+                : 'Unknown'}
+            </strong>
+
+            <small>
+              {device.is_charging === true
+                ? 'Currently charging'
+                : device.is_charging === false
+                  ? 'Not charging'
+                  : 'Charging state unknown'}
+            </small>
+          </div>
+        </article>
+        <article className="device-dashboard-summary-card device-management-summary-card">
+          <span className="device-dashboard-summary-icon">
+            <Smartphone
+              aria-hidden="true"
+              size={21}
+            />
+          </span>
+
+          <div>
+            <span>Management mode</span>
+
+            <strong>
+              {formatManagementMode(
+                device.management_mode,
+              )}
+            </strong>
+
+            <small>
+              {device.is_device_owner
+                ? 'Enterprise Device Owner capabilities available'
+                : device.is_device_admin
+                  ? 'Device Admin active; enterprise controls limited'
+                  : 'Standard app management; advanced controls unavailable'}
+            </small>
+          </div>
+        </article>
+
+
+        <article className="device-dashboard-summary-card">
+          <span className="device-dashboard-summary-icon">
+            <Wifi
+              aria-hidden="true"
+              size={21}
+            />
+          </span>
+
+          <div>
+            <span>Connectivity</span>
+
+            <strong>
+              {device.wifi_ssid ??
+                'Not connected'}
+            </strong>
+
+            <small>
+              {device.ip_address ??
+                'No IP reported'}
+            </small>
+          </div>
+        </article>
+
+        <article className="device-dashboard-summary-card">
+          <span className="device-dashboard-summary-icon">
+            <Smartphone
+              aria-hidden="true"
+              size={21}
+            />
+          </span>
+
+          <div>
+            <span>Platform</span>
+
+            <strong>
+              Android{' '}
+              {device.android_version ??
+                'Unknown'}
+            </strong>
+
+            <small>
+              Agent{' '}
+              {device.agent_version ??
+                'Unknown'}
+            </small>
+          </div>
+        </article>
+
+        <article className="device-dashboard-summary-card">
+          <span className="device-dashboard-summary-icon">
+            <Clock3
+              aria-hidden="true"
+              size={21}
+            />
+          </span>
+
+          <div>
+            <span>Last heartbeat</span>
+
+            <strong>
+              {formatRelativeTime(
+                device.last_seen_at,
+              )}
+            </strong>
+
+            <small>
+              {formatDateTime(
+                device.last_seen_at,
+              )}
+            </small>
+          </div>
+        </article>
+      </section>
+
+      <nav
+        aria-label="Device sections"
+        className="device-dashboard-tabs"
+      >
+        <button
+          className={
+            activeTab === 'overview'
+              ? 'device-dashboard-tab device-dashboard-tab-active'
+              : 'device-dashboard-tab'
+          }
+          onClick={() =>
+            setActiveTab('overview')
+          }
+          type="button"
+        >
+          Overview
+        </button>
+
+                <button
+          className={
+            activeTab === 'applications'
+              ? 'device-dashboard-tab active'
+              : 'device-dashboard-tab'
+          }
+          onClick={() =>
+            setActiveTab('applications')
+          }
+          type="button"
+        >
+          Applications
+        </button>
+<button
+          className={
+            activeTab === 'activity'
+              ? 'device-dashboard-tab device-dashboard-tab-active'
+              : 'device-dashboard-tab'
+          }
+          onClick={() =>
+            setActiveTab('activity')
+          }
+          type="button"
+        >
+          Activity
+        </button>
+
+        <button
+          className="device-dashboard-tab"
+          disabled
+          type="button"
+        >
+          Commands
+        </button>
+
+        <button
+          className="device-dashboard-tab"
+          disabled
+          type="button"
+        >
+          Location
+        </button>
+
+        <button
+          className="device-dashboard-tab"
+          disabled
+          type="button"
+        >
+          Notes
+        </button>
+      </nav>
+
+      {activeTab === 'overview' && (
+        <div className="device-dashboard-layout">
+          <main className="device-dashboard-main">
+          <section className="device-enterprise-readiness">
+            <div>
+              <p className="eyebrow">
+                ENTERPRISE READINESS
+              </p>
+
+              <h2>Management capabilities</h2>
+            </div>
+
+            <div className="device-capability-grid">
+              <article>
+                <span>Device Admin</span>
+                <strong>
+                  {device.is_device_admin
+                    ? 'Available'
+                    : 'Not active'}
+                </strong>
+              </article>
+
+              <article>
+                <span>Device Owner</span>
+                <strong>
+                  {device.is_device_owner
+                    ? 'Available'
+                    : 'Not provisioned'}
+                </strong>
+              </article>
+
+              <article>
+                <span>Lock task / kiosk</span>
+                <strong>
+                  {device.supports_lock_task
+                    ? 'Supported'
+                    : 'Unavailable'}
+                </strong>
+              </article>
+              <article>
+                <span>Device lock</span>
+                <strong>
+                  {device.supports_device_lock
+                    ? 'Ready'
+                    : 'Unavailable'}
+                </strong>
+              </article>
+
+              <article>
+                <span>Kiosk state</span>
+                <strong>
+                  {device.is_lock_task_active
+                    ? 'Active'
+                    : 'Inactive'}
+                </strong>
+              </article>
+            </div>
+
+            {!device.is_device_owner && (
+              <p className="device-enterprise-note">
+                Advanced enterprise actions remain disabled until a future
+                test device is provisioned as Device Owner. This device
+                remains fully usable in its current setup.
+              </p>
+            )}
+          </section>
+
+
+          <section className="device-policy-status">
+            <div>
+              <p className="eyebrow">
+                POLICY STATUS
+              </p>
+              <h2>Control readiness</h2>
+            </div>
+
+            <div className="device-policy-status-grid">
+              <div>
+                <span>Remote lock</span>
+                <strong>
+                  {device.supports_device_lock
+                    ? 'Available'
+                    : 'Blocked'}
+                </strong>
+                <small>
+                  {device.supports_device_lock
+                    ? 'Hive can request an immediate device lock.'
+                    : 'Enable Device Admin or provision Device Owner.'}
+                </small>
+              </div>
+
+              <div>
+                <span>Kiosk / lock task</span>
+                <strong>
+                  {device.supports_lock_task
+                    ? 'Ready'
+                    : 'Requires Device Owner'}
+                </strong>
+                <small>
+                  {device.is_lock_task_active
+                    ? 'Lock task mode is currently active.'
+                    : 'Lock task mode is currently inactive.'}
+                </small>
+              </div>
+            </div>
+          </section>          <section className="device-policy-management">
+            <div>
+              <p className="eyebrow">
+                MANAGED POLICIES
+              </p>
+
+              <h2>Managed policies</h2>
+
+              <p className="device-policy-management-note">
+                These controls use Android Device Admin on this device.
+                Changes are securely queued through Hive.
+              </p>
+            </div>
+
+            <div className="device-policy-management-grid">
+              <article>
+                <div>
+                  <span>Camera access</span>
+
+                  <strong>
+                    {device.camera_disabled === true
+                      ? 'Disabled'
+                      : device.camera_disabled === false
+                        ? 'Enabled'
+                        : 'Not reported'}
+                  </strong>
+
+                  <small>
+                    Desired:{' '}
+                    {device.desired_camera_disabled === true
+                      ? 'Disabled'
+                      : device.desired_camera_disabled === false
+                        ? 'Enabled'
+                        : 'No policy set'}
+                  </small>
+                </div>
+
+                <div className="device-policy-buttons">
+                  <button
+                    className="secondary-button"
+                    disabled={
+                      sendingCommand !== null ||
+                      !device.supports_camera_policy ||
+                      device.camera_disabled === false
+                    }
+                    onClick={() =>
+                      void sendCommand(
+                        'SET_CAMERA_DISABLED',
+                        { disabled: false },
+                      ).then(() => {
+                        window.setTimeout(() => {
+                          void loadDevice()
+                        }, 2_000)
+                      })
+                    }
+                    type="button"
+                  >
+                    Enable camera
+                  </button>
+
+                  <button
+                    className="secondary-button"
+                    disabled={
+                      sendingCommand !== null ||
+                      !device.supports_camera_policy ||
+                      device.camera_disabled === true
+                    }
+                    onClick={() =>
+                      void sendCommand(
+                        'SET_CAMERA_DISABLED',
+                        { disabled: true },
+                      ).then(() => {
+                        window.setTimeout(() => {
+                          void loadDevice()
+                        }, 2_000)
+                      })
+                    }
+                    type="button"
+                  >
+                    Disable camera
+                  </button>
+                </div>
+              </article>
+
+              <article>
+                <div>
+                  <span>Screen lock timeout</span>
+
+                  <strong>
+                    {device.maximum_time_to_lock_ms == null
+                      ? 'Not reported'
+                      : device.maximum_time_to_lock_ms === 0
+                        ? 'System default'
+                        : `${Math.round(
+                            device.maximum_time_to_lock_ms / 60_000,
+                          )} min`}
+                  </strong>
+
+                  <small>
+                    Maximum idle time before Android locks.
+                  </small>
+                </div>
+
+                <select
+                  aria-label="Screen lock timeout"
+                  className="device-policy-select"
+                  disabled={
+                    sendingCommand !== null ||
+                    !device.supports_lock_timeout_policy
+                  }
+                  onChange={(event) => {
+                    const timeoutMs = Number(
+                      event.target.value,
+                    )
+
+                    void sendCommand(
+                      'SET_LOCK_TIMEOUT',
+                      { timeout_ms: timeoutMs },
+                    ).then(() => {
+                      window.setTimeout(() => {
+                        void loadDevice()
+                      }, 2_000)
+                    })
+                  }}
+                  value={
+                    device.desired_maximum_time_to_lock_ms ??
+                    device.maximum_time_to_lock_ms ??
+                    0
+                  }
+                >
+                  <option value={0}>
+                    System default
+                  </option>
+
+                  <option value={60000}>
+                    1 minute
+                  </option>
+
+                  <option value={300000}>
+                    5 minutes
+                  </option>
+
+                  <option value={900000}>
+                    15 minutes
+                  </option>
+
+                  <option value={1800000}>
+                    30 minutes
+                  </option>
+                </select>
+              </article>
+            </div>
+
+            {(!device.supports_camera_policy ||
+              !device.supports_lock_timeout_policy) && (
+              <p className="device-enterprise-note">
+                Activate Device Admin before using managed policy controls.
+              </p>
+            )}
+          </section>
+
+          <section className="device-dashboard-panel">
+            <div className="device-dashboard-panel-header">
+              <div>
+                <p className="eyebrow">
+                  DEVICE OVERVIEW
+                </p>
+
+                <h2>Device information</h2>
+              </div>
+            </div>
+
+            <dl className="device-dashboard-information">
+              <div>
+                <dt>Database UUID</dt>
+                <dd>
+                  <code>{device.id}</code>
+                </dd>
+              </div>
+
+              <div>
+                <dt>Hive ID</dt>
+                <dd>
+                  <code>{device.hive_id}</code>
+                </dd>
+              </div>
+
+              <div>
+                <dt>Asset ID</dt>
+                <dd>
+                  {device.asset_id ||
+                    'Not assigned'}
+                </dd>
+              </div>
+
+              <div>
+                <dt>Serial number</dt>
+                <dd>
+                  {device.serial_number ??
+                    'Not reported'}
+                </dd>
+              </div>
+
+              <div>
+                <dt>IMEI</dt>
+                <dd>
+                  {device.imei ??
+                    'Not reported'}
+                </dd>
+              </div>
+
+              <div>
+                <dt>Manufacturer</dt>
+                <dd>
+                  {device.manufacturer ??
+                    'Not reported'}
+                </dd>
+              </div>
+
+              <div>
+                <dt>Model</dt>
+                <dd>
+                  {device.model ??
+                    'Not reported'}
+                </dd>
+              </div>
+
+              <div>
+                <dt>Android version</dt>
+                <dd>
+                  {device.android_version ??
+                    'Not reported'}
+                </dd>
+              </div>
+
+              <div>
+                <dt>Agent version</dt>
+                <dd>
+                  {device.agent_version ??
+                    'Not reported'}
+                </dd>
+              </div>
+            </dl>
+          </section>
+          </main>
+        <aside className="device-dashboard-side">
+          <section className="device-dashboard-panel">
+            <div className="device-dashboard-panel-header">
+              <div>
+                <p className="eyebrow">
+                  LIVE STATUS
+                </p>
+
+                <h2>Current state</h2>
+              </div>
+            </div>
+
+            <div className="device-dashboard-status-list">
+              <div>
+                <span>Connection</span>
+
+                <strong>
+                  {online
+                    ? 'Online'
+                    : 'Offline'}
+                </strong>
+              </div>
+
+              <div>
+                <span>Inventory status</span>
+
+                <StatusBadge
+                  status={device.status}
+                />
+              </div>
+
+              <div>
+                <span>Wi-Fi network</span>
+
+                <strong>
+                  {device.wifi_ssid ??
+                    'Not connected'}
+                </strong>
+              </div>
+
+              <div>
+                <span>IP address</span>
+
+                <strong>
+                  {device.ip_address ??
+                    'Not reported'}
+                </strong>
+              </div>
+
+              <div>
+                <span>Last heartbeat</span>
+
+                <strong>
+                  {formatRelativeTime(
+                    device.last_seen_at,
+                  )}
+                </strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="device-dashboard-panel">
+            <div className="device-dashboard-panel-header">
+              <div>
+                <p className="eyebrow">
+                  LOCATION
+                </p>
+
+                <h2>Last known location</h2>
+              </div>
+
+              <MapPin
+                aria-hidden="true"
+                size={19}
+              />
+            </div>
+
+            <div className="device-dashboard-location">
+  <button
+    aria-label="Refresh latest location"
+    className="icon-button"
+    disabled={locationLoading}
+    onClick={() =>
+      void loadLocation(true)
+    }
+    type="button"
+  >
+<RefreshCw
+  aria-hidden="true"
+  size={18}
+  className={
+    locationLoading ? "spin" : ""
+  }
+/>
+  </button>
+
+  {locationLoading ? (
+    <p className="device-dashboard-location-message">
+      Loading location...
+    </p>
+  ) : locationError ? (
+    <p className="device-dashboard-location-error">
+      {locationError}
+    </p>
+  ) : location ? (
+    <>
+      <div className="device-dashboard-location-grid">
+        <div>
+          <span>Latitude</span>
+          <strong>
+            {location.latitude.toFixed(6)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Longitude</span>
+          <strong>
+            {location.longitude.toFixed(6)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Accuracy</span>
+          <strong>
+  {location.accuracy == null ||
+  Number.isNaN(location.accuracy)
+    ? 'Not reported'
+    : `${Math.round(location.accuracy)} m`}
+</strong>
+        </div>
+
+        <div>
+          <span>Recorded</span>
+          <strong>
+            {formatDateTime(
+              location.recorded_at,
+            )}
+          </strong>
+        </div>
+      </div>
+
+      <a
+        className="device-dashboard-map-link"
+        href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
+        rel="noreferrer"
+        target="_blank"
+      >
+        <MapPin
+          aria-hidden="true"
+          size={16}
+        />
+
+        Open location in Google Maps
+      </a>
+    </>
+  ) : (
+    <p className="device-dashboard-location-message">
+      No location has been reported yet.
+    </p>
+  )}
+</div>
+          </section>
+                </aside>
+        </div>
+      )}
+
+      {activeTab === 'applications' && (
+        <ApplicationInventoryPanel
+          applications={applications}
+          error={applicationsError}
+          loading={applicationsLoading}
+          onCommand={handleApplicationCommand}
+          onRefreshInventory={handleRefreshApps}
+          onReload={() =>
+            void loadApplications(true)
+          }
+          sendingCommand={sendingCommand}
+        />
+      )}
+
+      {activeTab === 'activity' && (
+          <section className="device-dashboard-panel">
+  <div className="device-dashboard-panel-header">
+    <div>
+      <p className="eyebrow">
+        DEVICE ACTIVITY
+      </p>
+
+      <h2>Recent activity</h2>
+    </div>
+
+    <button
+      aria-label="Refresh device activity"
+      className="icon-button"
+      disabled={commandsLoading}
+      onClick={() =>
+  void loadCommands(true)
+}
+      type="button"
+    >
+      <RefreshCw
+  aria-hidden="true"
+  size={17}
+  className={
+    commandsLoading ? "spin" : ""
+  }
+/>
+      
+    </button>
+  </div>
+
+  {commandsLoading && commands.length === 0 ? (
+    <div className="device-dashboard-empty">
+      <p>Loading device activity...</p>
+    </div>
+  ) : commandsError ? (
+    <p
+      className="device-dashboard-command-error"
+      role="alert"
+    >
+      {commandsError}
+    </p>
+  ) : commands.length === 0 ? (
+    <div className="device-dashboard-empty">
+      <p>
+        No command activity has been recorded
+        for this device.
+      </p>
+    </div>
+  ) : (
+    <ol className="device-activity-timeline">
+      {commands.slice(0, 12).map(
+        (command) => {
+          const activityTime =
+            getCommandActivityTime(command)
+
+          return (
+            <li
+              className="device-activity-item"
+              key={command.id}
+            >
+              <span
+                aria-hidden="true"
+                className={`device-activity-marker device-activity-marker-${command.status.toLowerCase()}`}
+              />
+
+              <div className="device-activity-content">
+                <div className="device-activity-heading">
+                  <strong>
+                    {formatCommandName(
+                      command.command,
+                    )}
+                  </strong>
+
+                  <span
+                    className={`device-activity-status device-activity-status-${command.status.toLowerCase()}`}
+                  >
+                    {formatCommandName(
+                      command.status,
+                    )}
+                  </span>
+                </div>
+
+                <p>
+                  {command.result_message ??
+                    'Command submitted to the Android agent.'}
+                </p>
+
+                <time dateTime={activityTime}>
+                  {formatRelativeTime(
+                    activityTime,
+                  )}
+                  {' · '}
+                  {formatDateTime(
+                    activityTime,
+                  )}
+                </time>
+              </div>
+            </li>
+          )
+        },
+      )}
+    </ol>
+  )}
+</section>
+      )}
+    </section>
+  )
+}
+
+
+
+
+
+
+

@@ -1,42 +1,205 @@
-import { Activity, Box, Radio, ShieldCheck } from 'lucide-react'
+import {
+  Navigate,
+  Route,
+  Routes,
+} from 'react-router-dom'
 
-const foundations = [
-  { label: 'Device fleet', detail: 'EA660 identity and health', icon: Radio },
-  { label: 'Event operations', detail: 'Assignments, picks and returns', icon: Activity },
-  { label: 'Inventory state', detail: 'Condition and availability', icon: Box },
-  { label: 'Secure foundation', detail: 'Commercial-grade architecture', icon: ShieldCheck },
-]
+import {
+  AuthProvider,
+  useAuth,
+} from './AuthContext'
+import { AppShell } from '../components/layout/AppShell'
+import { DashboardPage } from '../pages/Dashboard'
+import { DeviceDashboardPage } from '../pages/DeviceDashboard'
+import { DevicesPage } from '../pages/Devices'
+import { FleetMapPage } from '../pages/FleetMap'
+import { EnrollmentsPage } from '../pages/Enrollments'
+import { LoginPage } from '../pages/Login'
+
+
+function PlaceholderPage({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string
+  title: string
+  description: string
+}) {
+  return (
+    <section className="placeholder-page">
+      <p className="eyebrow">{eyebrow}</p>
+      <h1>{title}</h1>
+      <p>{description}</p>
+    </section>
+  )
+}
+
+function LoadingScreen() {
+  return (
+    <main className="auth-loading">
+      <div className="auth-loading-logo">
+        H
+      </div>
+
+      <p>Loading Hive…</p>
+    </main>
+  )
+}
+
+function ProtectedApplication() {
+  const {
+    isAuthenticated,
+    isLoading,
+  } = useAuth()
+
+  if (isLoading) {
+    return <LoadingScreen />
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Navigate
+        replace
+        to="/login"
+      />
+    )
+  }
+
+  return (
+    <AppShell>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Navigate
+              replace
+              to="/dashboard"
+            />
+          }
+        />
+
+        <Route
+          path="/dashboard"
+          element={<DashboardPage />}
+        />
+
+        <Route
+          path="/enrollments"
+          element={<EnrollmentsPage />}
+        />
+
+        <Route
+          path="/devices"
+          element={<DevicesPage />}
+        />
+
+        <Route
+          path="/map"
+          element={<FleetMapPage />}
+        />
+
+<Route
+  path="/devices/:deviceId"
+  element={<DeviceDashboardPage />}
+/>
+
+        <Route
+          path="/events"
+          element={
+            <PlaceholderPage
+              eyebrow="EVENT OPERATIONS"
+              title="Events"
+              description="Create events and manage scanner allocations."
+            />
+          }
+        />
+
+        <Route
+          path="/assignments"
+          element={
+            <PlaceholderPage
+              eyebrow="DEVICE ASSIGNMENTS"
+              title="Assignments"
+              description="Track scanners assigned to events and staff."
+            />
+          }
+        />
+
+        <Route
+          path="/reports"
+          element={
+            <PlaceholderPage
+              eyebrow="REPORTING"
+              title="Reports"
+              description="Export fleet, event and assignment reports."
+            />
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <PlaceholderPage
+              eyebrow="HIVE CONFIGURATION"
+              title="Settings"
+              description="Manage users, defaults and platform settings."
+            />
+          }
+        />
+
+        <Route
+          path="*"
+          element={
+            <Navigate
+              replace
+              to="/dashboard"
+            />
+          }
+        />
+      </Routes>
+    </AppShell>
+  )
+}
+
+function ApplicationRoutes() {
+  const {
+    isAuthenticated,
+    isLoading,
+  } = useAuth()
+
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          isLoading ? (
+            <LoadingScreen />
+          ) : isAuthenticated ? (
+            <Navigate
+              replace
+              to="/dashboard"
+            />
+          ) : (
+            <LoginPage />
+          )
+        }
+      />
+
+      <Route
+        path="/*"
+        element={
+          <ProtectedApplication />
+        }
+      />
+    </Routes>
+  )
+}
 
 export function App() {
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div className="brand-mark" aria-hidden="true">H</div>
-        <div>
-          <p className="eyebrow">BLACKBIRD</p>
-          <h1>Hive</h1>
-        </div>
-        <span className="status-pill">Sprint 1 foundation</span>
-      </header>
-
-      <section className="hero">
-        <p className="eyebrow">DEVICE OPERATIONS, BUILT PROPERLY</p>
-        <h2>The operating layer for event devices.</h2>
-        <p className="hero-copy">
-          Hive is being built to give event teams a clear, live view of every scanner,
-          assignment and operational risk.
-        </p>
-      </section>
-
-      <section className="foundation-grid" aria-label="Hive foundations">
-        {foundations.map(({ label, detail, icon: Icon }) => (
-          <article className="foundation-card" key={label}>
-            <Icon size={20} aria-hidden="true" />
-            <h3>{label}</h3>
-            <p>{detail}</p>
-          </article>
-        ))}
-      </section>
-    </main>
+    <AuthProvider>
+      <ApplicationRoutes />
+    </AuthProvider>
   )
 }

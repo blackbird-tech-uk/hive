@@ -1,1 +1,1 @@
-"""Inventory module boundary."""
+"""Installed application inventory module."""
