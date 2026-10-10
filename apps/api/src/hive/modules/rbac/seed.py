@@ -20,7 +20,6 @@ from hive.modules.rbac.models import (
 )
 from hive.modules.users.models import User
 
-
 PERMISSIONS: tuple[tuple[str, str, str], ...] = (
     (
         "organization.read",
