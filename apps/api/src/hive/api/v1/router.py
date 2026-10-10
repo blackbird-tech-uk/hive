@@ -6,6 +6,9 @@ from hive.modules.device_agent.router import router as device_agent_router
 from hive.modules.device_commands.router import (
     router as device_commands_router,
 )
+from hive.modules.device_locations.router import (
+    router as device_locations_router,
+)
 from hive.modules.devices.router import router as devices_router
 from hive.modules.enrollment.router import (
     public_router as enrollment_public_router,
@@ -18,9 +21,6 @@ from hive.modules.organizations.router import (
 )
 from hive.modules.realtime.router import router as realtime_router
 from hive.modules.users.router import router as users_router
-from hive.modules.device_locations.router import (
-    router as device_locations_router,
-)
 
 api_router = APIRouter()
 
