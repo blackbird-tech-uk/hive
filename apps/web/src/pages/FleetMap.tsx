@@ -19,6 +19,7 @@ export function FleetMapPage() {
   const [locations, setLocations] = useState<DeviceLocation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -30,6 +31,7 @@ export function FleetMapPage() {
       setDevices(nextDevices)
       setLocations(nextLocations)
       setError(null)
+      setCurrentTime(Date.now())
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load fleet locations.')
     } finally {
@@ -38,6 +40,10 @@ export function FleetMapPage() {
   }, [])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    const clock = window.setInterval(() => setCurrentTime(Date.now()), 1_000)
+    return () => window.clearInterval(clock)
+  }, [])
   useEffect(() => {
     const timer = window.setInterval(() => void load(), 60_000)
     return () => window.clearInterval(timer)
@@ -59,7 +65,7 @@ export function FleetMapPage() {
       <div className="fleet-map-grid">
         {rows.map(({ device, location }) => {
           if (!device) return null
-          const online = isDeviceOnline(device, Date.now())
+          const online = isDeviceOnline(device, currentTime)
           const mapsUrl = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`
           return <article className="fleet-map-card" key={device.id}>
             <div className="fleet-map-card-head"><div><p className="eyebrow">SCANNER</p><h2>{device.hive_id || device.asset_id}</h2></div><span className={online ? 'fleet-map-online' : 'fleet-map-offline'}>{online ? <Wifi size={15}/> : <WifiOff size={15}/>} {online ? 'Online' : 'Offline'}</span></div>
