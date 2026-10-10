@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from hive.db.session import SessionLocal
-from hive.modules.devices.models import Device
 from hive.modules.organizations.models import (
     MembershipStatus,
     Organization,
