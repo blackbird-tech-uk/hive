@@ -5,14 +5,21 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
+import android.os.CancellationSignal
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import com.blackbird.hiveagent.api.DeviceLocationUpload
 import com.blackbird.hiveagent.api.HiveApiClient
 import com.blackbird.hiveagent.commands.CommandProcessor
 import com.blackbird.hiveagent.data.local.TokenStorage
 import com.blackbird.hiveagent.device.DeviceInfoProvider
+import com.blackbird.hiveagent.storage.TelemetryQueue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +29,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import java.time.Instant
+import kotlin.coroutines.resume
 
 class CommandPollingService : Service() {
 
@@ -33,6 +43,9 @@ class CommandPollingService : Service() {
     private lateinit var apiClient: HiveApiClient
     private lateinit var deviceInfoProvider: DeviceInfoProvider
     private lateinit var commandProcessor: CommandProcessor
+    private lateinit var locationManager: LocationManager
+    private lateinit var telemetryQueue: TelemetryQueue
+    private var lastLocationUploadAt = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -41,6 +54,8 @@ class CommandPollingService : Service() {
         apiClient = HiveApiClient()
         deviceInfoProvider =
             DeviceInfoProvider(applicationContext)
+        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        telemetryQueue = TelemetryQueue(applicationContext)
         commandProcessor = CommandProcessor(
             context = applicationContext,
             apiClient = apiClient,
@@ -96,6 +111,9 @@ class CommandPollingService : Service() {
                 stopSelf()
                 return
             }
+
+        flushQueuedLocations(deviceToken)
+        uploadLatestLocationIfDue(deviceToken)
 
         val heartbeat =
             apiClient.sendHeartbeat(
@@ -160,6 +178,99 @@ class CommandPollingService : Service() {
         }
     }
 
+
+    private suspend fun uploadLatestLocationIfDue(deviceToken: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastLocationUploadAt < LOCATION_UPLOAD_INTERVAL_MS) return
+
+        val fineGranted = ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!fineGranted && !coarseGranted) return
+
+        val location = currentLocation() ?: latestKnownLocation() ?: return
+        val payload = DeviceLocationUpload(
+            latitude = location.latitude,
+            longitude = location.longitude,
+            accuracy = if (location.hasAccuracy()) location.accuracy else null,
+            altitude = if (location.hasAltitude()) location.altitude else null,
+            speed = if (location.hasSpeed()) location.speed else null,
+            bearing = if (location.hasBearing()) location.bearing else null,
+            provider = location.provider,
+            recordedAt = Instant.ofEpochMilli(location.time).toString(),
+        )
+
+        try {
+            apiClient.uploadLocation(deviceToken, payload)
+        } catch (error: Exception) {
+            telemetryQueue.enqueueLocation(payload)
+            Log.w(LOG_TAG, "Location upload queued for retry", error)
+        }
+        lastLocationUploadAt = now
+    }
+
+    private suspend fun flushQueuedLocations(deviceToken: String) {
+        var sent = 0
+        while (sent < MAX_QUEUE_FLUSH_PER_POLL) {
+            val queued = telemetryQueue.peekLocation() ?: return
+            try {
+                apiClient.uploadLocation(deviceToken, queued)
+                telemetryQueue.removeFirstLocation()
+                sent += 1
+            } catch (error: Exception) {
+                Log.d(LOG_TAG, "Queued location still waiting for connectivity")
+                return
+            }
+        }
+    }
+
+    private suspend fun currentLocation(): Location? {
+        val provider = when {
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ->
+                LocationManager.GPS_PROVIDER
+            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ->
+                LocationManager.NETWORK_PROVIDER
+            else -> return null
+        }
+
+        return try {
+            suspendCancellableCoroutine { continuation ->
+                val cancellationSignal = CancellationSignal()
+                continuation.invokeOnCancellation { cancellationSignal.cancel() }
+                locationManager.getCurrentLocation(
+                    provider,
+                    cancellationSignal,
+                    mainExecutor,
+                ) { location ->
+                    if (continuation.isActive) continuation.resume(location)
+                }
+            }
+        } catch (error: SecurityException) {
+            Log.w(LOG_TAG, "Location permission unavailable", error)
+            null
+        } catch (error: Exception) {
+            Log.w(LOG_TAG, "Fresh location unavailable; using last known location", error)
+            null
+        }
+    }
+
+    private fun latestKnownLocation(): Location? {
+        return locationManager.getProviders(true)
+            .mapNotNull { provider ->
+                try {
+                    locationManager.getLastKnownLocation(provider)
+                } catch (_: SecurityException) {
+                    null
+                }
+            }
+            .maxByOrNull { it.time }
+    }
+
     private fun createForegroundNotification():
         Notification {
         return NotificationCompat.Builder(
@@ -217,5 +328,10 @@ class CommandPollingService : Service() {
 
         private const val POLL_INTERVAL_MS =
             10_000L
+
+        private const val LOCATION_UPLOAD_INTERVAL_MS =
+            60_000L
+
+        private const val MAX_QUEUE_FLUSH_PER_POLL = 20
     }
 }

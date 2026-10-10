@@ -4,6 +4,8 @@ import { BrowserRouter } from "react-router-dom";
 
 import { App } from "./app/App";
 import "./styles/index.css";
+import "./styles/fleet-operations.css";
+import "./styles/fleet-map.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
