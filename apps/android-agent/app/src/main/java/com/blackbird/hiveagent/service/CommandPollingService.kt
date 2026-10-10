@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.os.CancellationSignal
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -28,7 +29,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.time.Instant
+import kotlin.coroutines.resume
 
 class CommandPollingService : Service() {
 
@@ -190,7 +193,7 @@ class CommandPollingService : Service() {
         ) == PackageManager.PERMISSION_GRANTED
         if (!fineGranted && !coarseGranted) return
 
-        val location = latestKnownLocation() ?: return
+        val location = currentLocation() ?: latestKnownLocation() ?: return
         val payload = DeviceLocationUpload(
             latitude = location.latitude,
             longitude = location.longitude,
@@ -223,6 +226,36 @@ class CommandPollingService : Service() {
                 Log.d(LOG_TAG, "Queued location still waiting for connectivity")
                 return
             }
+        }
+    }
+
+    private suspend fun currentLocation(): Location? {
+        val provider = when {
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ->
+                LocationManager.GPS_PROVIDER
+            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ->
+                LocationManager.NETWORK_PROVIDER
+            else -> return null
+        }
+
+        return try {
+            suspendCancellableCoroutine { continuation ->
+                val cancellationSignal = CancellationSignal()
+                continuation.invokeOnCancellation { cancellationSignal.cancel() }
+                locationManager.getCurrentLocation(
+                    provider,
+                    cancellationSignal,
+                    mainExecutor,
+                ) { location ->
+                    if (continuation.isActive) continuation.resume(location)
+                }
+            }
+        } catch (error: SecurityException) {
+            Log.w(LOG_TAG, "Location permission unavailable", error)
+            null
+        } catch (error: Exception) {
+            Log.w(LOG_TAG, "Fresh location unavailable; using last known location", error)
+            null
         }
     }
 
