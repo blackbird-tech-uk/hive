@@ -14,7 +14,11 @@ from hive.modules.organizations.models import (
     OrganizationMembership,
     OrganizationStatus,
 )
-from hive.modules.rbac.seed import seed_permissions, seed_roles, assign_owner_role
+from hive.modules.rbac.seed import (
+    assign_owner_role,
+    seed_permissions,
+    seed_roles,
+)
 from hive.modules.users.models import User, UserRole
 from hive.modules.users.service import password_hash
 
