@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from hive.db.session import get_db
+from hive.modules.auth.dependencies import CurrentUser
 from hive.modules.users.schemas import (
     UserCreate,
     UserResponse,
@@ -32,6 +33,7 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 def create_user(
     payload: UserCreate,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> UserResponse:
     service = UserService(db)
 
@@ -48,7 +50,10 @@ def create_user(
     "",
     response_model=list[UserResponse],
 )
-def list_users(db: DatabaseSession) -> list[UserResponse]:
+def list_users(
+    db: DatabaseSession,
+    current_user: CurrentUser,
+) -> list[UserResponse]:
     service = UserService(db)
     return list(service.list_users())
 
@@ -60,6 +65,7 @@ def list_users(db: DatabaseSession) -> list[UserResponse]:
 def get_user(
     user_id: UUID,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> UserResponse:
     service = UserService(db)
 
