@@ -12,3 +12,6 @@ export async function getDeviceLocationHistory(
     `/device-locations/history/${deviceId}?limit=${limit}`,
   )
 }
+export async function getLatestDeviceLocations(): Promise<DeviceLocation[]> {
+  return api.get<DeviceLocation[]>('/device-locations/latest')
+}
