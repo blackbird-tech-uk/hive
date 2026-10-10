@@ -18,6 +18,7 @@ import com.blackbird.hiveagent.api.HiveApiClient
 import com.blackbird.hiveagent.commands.CommandProcessor
 import com.blackbird.hiveagent.data.local.TokenStorage
 import com.blackbird.hiveagent.device.DeviceInfoProvider
+import com.blackbird.hiveagent.storage.TelemetryQueue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ class CommandPollingService : Service() {
     private lateinit var deviceInfoProvider: DeviceInfoProvider
     private lateinit var commandProcessor: CommandProcessor
     private lateinit var locationManager: LocationManager
+    private lateinit var telemetryQueue: TelemetryQueue
     private var lastLocationUploadAt = 0L
 
     override fun onCreate() {
@@ -50,6 +52,7 @@ class CommandPollingService : Service() {
         deviceInfoProvider =
             DeviceInfoProvider(applicationContext)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        telemetryQueue = TelemetryQueue(applicationContext)
         commandProcessor = CommandProcessor(
             context = applicationContext,
             apiClient = apiClient,
@@ -106,6 +109,7 @@ class CommandPollingService : Service() {
                 return
             }
 
+        flushQueuedLocations(deviceToken)
         uploadLatestLocationIfDue(deviceToken)
 
         val heartbeat =
@@ -187,20 +191,39 @@ class CommandPollingService : Service() {
         if (!fineGranted && !coarseGranted) return
 
         val location = latestKnownLocation() ?: return
-        apiClient.uploadLocation(
-            deviceToken = deviceToken,
-            payload = DeviceLocationUpload(
-                latitude = location.latitude,
-                longitude = location.longitude,
-                accuracy = if (location.hasAccuracy()) location.accuracy else null,
-                altitude = if (location.hasAltitude()) location.altitude else null,
-                speed = if (location.hasSpeed()) location.speed else null,
-                bearing = if (location.hasBearing()) location.bearing else null,
-                provider = location.provider,
-                recordedAt = Instant.ofEpochMilli(location.time).toString(),
-            ),
+        val payload = DeviceLocationUpload(
+            latitude = location.latitude,
+            longitude = location.longitude,
+            accuracy = if (location.hasAccuracy()) location.accuracy else null,
+            altitude = if (location.hasAltitude()) location.altitude else null,
+            speed = if (location.hasSpeed()) location.speed else null,
+            bearing = if (location.hasBearing()) location.bearing else null,
+            provider = location.provider,
+            recordedAt = Instant.ofEpochMilli(location.time).toString(),
         )
+
+        try {
+            apiClient.uploadLocation(deviceToken, payload)
+        } catch (error: Exception) {
+            telemetryQueue.enqueueLocation(payload)
+            Log.w(LOG_TAG, "Location upload queued for retry", error)
+        }
         lastLocationUploadAt = now
+    }
+
+    private suspend fun flushQueuedLocations(deviceToken: String) {
+        var sent = 0
+        while (sent < MAX_QUEUE_FLUSH_PER_POLL) {
+            val queued = telemetryQueue.peekLocation() ?: return
+            try {
+                apiClient.uploadLocation(deviceToken, queued)
+                telemetryQueue.removeFirstLocation()
+                sent += 1
+            } catch (error: Exception) {
+                Log.d(LOG_TAG, "Queued location still waiting for connectivity")
+                return
+            }
+        }
     }
 
     private fun latestKnownLocation(): Location? {
@@ -275,5 +298,7 @@ class CommandPollingService : Service() {
 
         private const val LOCATION_UPLOAD_INTERVAL_MS =
             60_000L
+
+        private const val MAX_QUEUE_FLUSH_PER_POLL = 20
     }
 }
