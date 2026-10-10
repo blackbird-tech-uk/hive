@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import uuid
+import contextlib
 import logging
+import uuid
+
 import jwt
-
-logger = logging.getLogger(__name__)
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-
-
 from sqlalchemy.orm import Session
 
 from hive.core.realtime import device_connection_manager
@@ -17,6 +14,8 @@ from hive.core.security import decode_access_token
 from hive.db.session import SessionLocal
 from hive.modules.organizations.service import OrganizationService
 from hive.modules.users.repository import UserRepository
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/realtime",
@@ -92,10 +91,8 @@ async def device_updates(
             organization_id,
         )
 
-        try:
+        with contextlib.suppress(RuntimeError):
             await websocket.close(code=1011)
-        except RuntimeError:
-            pass
 
     finally:
         device_connection_manager.disconnect(

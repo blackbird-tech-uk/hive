@@ -17,10 +17,11 @@ class DeviceLocationResponse(BaseModel):
     latitude: float
     longitude: float
 
-    accuracy_meters: float | None = None
-    altitude_meters: float | None = None
-    speed_meters_per_second: float | None = None
-    bearing_degrees: float | None = None
+    accuracy: float | None = None
+    altitude: float | None = None
+    speed: float | None = None
+    bearing: float | None = None
+    provider: str | None = None
 
     recorded_at: datetime
     created_at: datetime
