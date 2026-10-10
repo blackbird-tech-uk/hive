@@ -26,6 +26,16 @@ from hive.modules.users.router import router as users_router
 
 api_router = APIRouter()
 
+
+@api_router.get("/health")
+def health_check() -> dict[str, str]:
+    return {
+        "status": "ok",
+        "service": "hive-api",
+        "version": "0.1.0",
+    }
+
+
 api_router.include_router(auth_router)
 api_router.include_router(device_locations_router)
 api_router.include_router(devices_router)
