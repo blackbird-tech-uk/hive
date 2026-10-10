@@ -5,10 +5,15 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import com.blackbird.hiveagent.api.DeviceLocationUpload
 import com.blackbird.hiveagent.api.HiveApiClient
 import com.blackbird.hiveagent.commands.CommandProcessor
 import com.blackbird.hiveagent.data.local.TokenStorage
@@ -22,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 class CommandPollingService : Service() {
 
@@ -33,6 +39,8 @@ class CommandPollingService : Service() {
     private lateinit var apiClient: HiveApiClient
     private lateinit var deviceInfoProvider: DeviceInfoProvider
     private lateinit var commandProcessor: CommandProcessor
+    private lateinit var locationManager: LocationManager
+    private var lastLocationUploadAt = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -41,6 +49,7 @@ class CommandPollingService : Service() {
         apiClient = HiveApiClient()
         deviceInfoProvider =
             DeviceInfoProvider(applicationContext)
+        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         commandProcessor = CommandProcessor(
             context = applicationContext,
             apiClient = apiClient,
@@ -96,6 +105,8 @@ class CommandPollingService : Service() {
                 stopSelf()
                 return
             }
+
+        uploadLatestLocationIfDue(deviceToken)
 
         val heartbeat =
             apiClient.sendHeartbeat(
@@ -160,6 +171,50 @@ class CommandPollingService : Service() {
         }
     }
 
+
+    private suspend fun uploadLatestLocationIfDue(deviceToken: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastLocationUploadAt < LOCATION_UPLOAD_INTERVAL_MS) return
+
+        val fineGranted = ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!fineGranted && !coarseGranted) return
+
+        val location = latestKnownLocation() ?: return
+        apiClient.uploadLocation(
+            deviceToken = deviceToken,
+            payload = DeviceLocationUpload(
+                latitude = location.latitude,
+                longitude = location.longitude,
+                accuracy = if (location.hasAccuracy()) location.accuracy else null,
+                altitude = if (location.hasAltitude()) location.altitude else null,
+                speed = if (location.hasSpeed()) location.speed else null,
+                bearing = if (location.hasBearing()) location.bearing else null,
+                provider = location.provider,
+                recordedAt = Instant.ofEpochMilli(location.time).toString(),
+            ),
+        )
+        lastLocationUploadAt = now
+    }
+
+    private fun latestKnownLocation(): Location? {
+        return locationManager.getProviders(true)
+            .mapNotNull { provider ->
+                try {
+                    locationManager.getLastKnownLocation(provider)
+                } catch (_: SecurityException) {
+                    null
+                }
+            }
+            .maxByOrNull { it.time }
+    }
+
     private fun createForegroundNotification():
         Notification {
         return NotificationCompat.Builder(
@@ -217,5 +272,8 @@ class CommandPollingService : Service() {
 
         private const val POLL_INTERVAL_MS =
             10_000L
+
+        private const val LOCATION_UPLOAD_INTERVAL_MS =
+            60_000L
     }
 }
