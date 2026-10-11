@@ -1,4 +1,6 @@
 import { Battery, MapPin, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TopBar } from '../components/layout/TopBar'
 import { getDevices } from '../lib/api'
@@ -61,6 +63,12 @@ export function FleetMapPage() {
     </section>
     {error && <div className="dashboard-alert" role="alert"><strong>Map data unavailable</strong><span>{error}</span></div>}
     <section className="fleet-map-panel">
+      {rows.length > 0 && <div className="fleet-map-live" aria-label="Latest scanner locations">
+        <MapContainer center={[rows[0].location.latitude, rows[0].location.longitude]} zoom={17} scrollWheelZoom={false}>
+          <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          {rows.map(({ device, location }) => device ? <Marker key={device.id} position={[location.latitude, location.longitude]}><Popup><strong>{device.asset_id || device.hive_id}</strong><br/>{isDeviceOnline(device, currentTime) ? 'Online' : 'Offline'} · {device.battery_level == null ? 'Battery unknown' : `${device.battery_level}% battery`}<br/>Updated {ageLabel(location.recorded_at)}</Popup></Marker> : null)}
+        </MapContainer>
+      </div>}
       <div className="fleet-map-summary"><MapPin size={18}/><strong>{rows.length}</strong><span>scanners reporting location</span><button className="secondary-button" onClick={() => void load()} type="button"><RefreshCw size={15}/>Refresh</button></div>
       <div className="fleet-map-grid">
         {rows.map(({ device, location }) => {
