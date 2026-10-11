@@ -8,6 +8,9 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from hive.db.session import SessionLocal
+# Import relationship targets so standalone bootstrap configures the full ORM registry.
+from hive.modules.devices.models import Device  # noqa: F401
+from hive.modules.rbac.models import MembershipRole, Role  # noqa: F401
 from hive.modules.organizations.models import (
     MembershipStatus,
     Organization,
