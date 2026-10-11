@@ -4,9 +4,9 @@ import { divIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TopBar } from '../components/layout/TopBar'
-import { getDevices } from '../lib/api'
+import { getAssignments, getDevices } from '../lib/api'
 import { getLatestDeviceLocations } from '../lib/api/locations'
-import type { Device, DeviceLocation } from '../lib/api/types'
+import type { Assignment, Device, DeviceLocation } from '../lib/api/types'
 import { isDeviceOnline } from '../lib/fleet'
 
 function scannerIcon(label: string, online: boolean) {
@@ -30,6 +30,7 @@ function ageLabel(value: string) {
 export function FleetMapPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [locations, setLocations] = useState<DeviceLocation[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
@@ -37,12 +38,14 @@ export function FleetMapPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [nextDevices, nextLocations] = await Promise.all([
+      const [nextDevices, nextLocations, nextAssignments] = await Promise.all([
         getDevices(),
         getLatestDeviceLocations(),
+        getAssignments(),
       ])
       setDevices(nextDevices)
       setLocations(nextLocations)
+      setAssignments(nextAssignments)
       setError(null)
       setCurrentTime(Date.now())
     } catch (e) {
@@ -62,10 +65,11 @@ export function FleetMapPage() {
     return () => window.clearInterval(timer)
   }, [load])
 
-  const rows = useMemo(() => locations.map((location) => ({
-    location,
-    device: devices.find((device) => device.id === location.device_id),
-  })).filter((row) => row.device), [devices, locations])
+  const rows = useMemo(() => locations.map((location) => {
+    const device = devices.find((candidate) => candidate.id === location.device_id)
+    const assignment = assignments.find((candidate) => candidate.device_id === location.device_id && candidate.status === 'assigned')
+    return { location, device, assignment }
+  }).filter((row) => row.device), [assignments, devices, locations])
 
   return <>
     <TopBar isLoading={loading} onRefresh={() => void load()} />
@@ -77,17 +81,18 @@ export function FleetMapPage() {
       {rows.length > 0 && <div className="fleet-map-live" aria-label="Latest scanner locations">
         <MapContainer center={[rows[0].location.latitude, rows[0].location.longitude]} zoom={17} scrollWheelZoom={false}>
           <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {rows.map(({ device, location }) => device ? <Marker key={device.id} position={[location.latitude, location.longitude]} icon={scannerIcon(device.asset_id || device.hive_id, isDeviceOnline(device, currentTime))}><Popup><strong>{device.asset_id || device.hive_id}</strong><br/>{isDeviceOnline(device, currentTime) ? 'Online' : 'Offline'} · {device.battery_level == null ? 'Battery unknown' : `${device.battery_level}% battery`}<br/>Updated {ageLabel(location.recorded_at)}</Popup></Marker> : null)}
+          {rows.map(({ device, location, assignment }) => device ? <Marker key={device.id} position={[location.latitude, location.longitude]} icon={scannerIcon(device.asset_id || device.hive_id, isDeviceOnline(device, currentTime))}><Popup><strong>{device.asset_id || device.hive_id}</strong>{assignment?.assigned_location && <><br/><span className="fleet-map-area">{assignment.assigned_location}</span></>}<br/>{isDeviceOnline(device, currentTime) ? 'Online' : 'Offline'} · {device.battery_level == null ? 'Battery unknown' : `${device.battery_level}% battery`}<br/>Updated {ageLabel(location.recorded_at)}</Popup></Marker> : null)}
         </MapContainer>
       </div>}
       <div className="fleet-map-summary"><MapPin size={18}/><strong>{rows.length}</strong><span>scanners reporting location</span><button className="secondary-button" onClick={() => void load()} type="button"><RefreshCw size={15}/>Refresh</button></div>
       <div className="fleet-map-grid">
-        {rows.map(({ device, location }) => {
+        {rows.map(({ device, location, assignment }) => {
           if (!device) return null
           const online = isDeviceOnline(device, currentTime)
           const mapsUrl = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`
           return <article className="fleet-map-card" key={device.id}>
             <div className="fleet-map-card-head"><div><p className="eyebrow">SCANNER</p><h2>{device.asset_id || device.hive_id}</h2></div><span className={online ? 'fleet-map-online' : 'fleet-map-offline'}>{online ? <Wifi size={15}/> : <WifiOff size={15}/>} {online ? 'Online' : 'Offline'}</span></div>
+            {assignment?.assigned_location && <div className="fleet-map-assignment"><MapPin size={15}/><div><span>Assigned area</span><strong>{assignment.assigned_location}</strong></div></div>}
             <div className="fleet-map-meta"><span><Battery size={15}/>{device.battery_level == null ? 'Battery unknown' : `${device.battery_level}%${device.is_charging ? ' · charging' : ''}`}</span><span><MapPin size={15}/>Updated {ageLabel(location.recorded_at)}</span></div>
             <p className="fleet-map-coordinates">{location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}{location.accuracy != null ? ` · ±${Math.round(location.accuracy)}m` : ''}</p>
             <a className="primary-button fleet-map-open" href={mapsUrl} rel="noreferrer" target="_blank">Open last known location</a>

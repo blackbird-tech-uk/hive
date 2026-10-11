@@ -13,3 +13,5 @@ export * from './inventory'
 
 export * from './events'
 export * from './enrollment'
+
+export * from './assignments'
