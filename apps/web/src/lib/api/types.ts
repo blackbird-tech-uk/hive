@@ -184,6 +184,20 @@ export interface UpdateDevicePayload {
   notes?: string | null
 }
 
+/* ---------- Assignments ---------- */
+
+export interface Assignment {
+  id: string
+  device_id: string
+  event_id: string
+  assigned_to_name: string | null
+  assigned_location: string | null
+  status: 'assigned' | 'returned' | 'lost' | 'repair' | string
+  assigned_at: string
+  returned_at: string | null
+  notes: string | null
+}
+
 /* ---------- Events ---------- */
 
 export type EventStatus =
