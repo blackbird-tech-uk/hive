@@ -1,5 +1,6 @@
 import { Battery, MapPin, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
+import { divIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TopBar } from '../components/layout/TopBar'
@@ -7,6 +8,16 @@ import { getDevices } from '../lib/api'
 import { getLatestDeviceLocations } from '../lib/api/locations'
 import type { Device, DeviceLocation } from '../lib/api/types'
 import { isDeviceOnline } from '../lib/fleet'
+
+function scannerIcon(label: string, online: boolean) {
+  return divIcon({
+    className: 'hive-scanner-marker-wrap',
+    html: `<div class="hive-scanner-marker ${online ? 'is-online' : 'is-offline'}"><span class="hive-scanner-marker-dot"></span><strong>${label.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char] ?? char))}</strong></div>`,
+    iconSize: [86, 34],
+    iconAnchor: [43, 34],
+    popupAnchor: [0, -36],
+  })
+}
 
 function ageLabel(value: string) {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000))
@@ -66,7 +77,7 @@ export function FleetMapPage() {
       {rows.length > 0 && <div className="fleet-map-live" aria-label="Latest scanner locations">
         <MapContainer center={[rows[0].location.latitude, rows[0].location.longitude]} zoom={17} scrollWheelZoom={false}>
           <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {rows.map(({ device, location }) => device ? <Marker key={device.id} position={[location.latitude, location.longitude]}><Popup><strong>{device.asset_id || device.hive_id}</strong><br/>{isDeviceOnline(device, currentTime) ? 'Online' : 'Offline'} · {device.battery_level == null ? 'Battery unknown' : `${device.battery_level}% battery`}<br/>Updated {ageLabel(location.recorded_at)}</Popup></Marker> : null)}
+          {rows.map(({ device, location }) => device ? <Marker key={device.id} position={[location.latitude, location.longitude]} icon={scannerIcon(device.asset_id || device.hive_id, isDeviceOnline(device, currentTime))}><Popup><strong>{device.asset_id || device.hive_id}</strong><br/>{isDeviceOnline(device, currentTime) ? 'Online' : 'Offline'} · {device.battery_level == null ? 'Battery unknown' : `${device.battery_level}% battery`}<br/>Updated {ageLabel(location.recorded_at)}</Popup></Marker> : null)}
         </MapContainer>
       </div>}
       <div className="fleet-map-summary"><MapPin size={18}/><strong>{rows.length}</strong><span>scanners reporting location</span><button className="secondary-button" onClick={() => void load()} type="button"><RefreshCw size={15}/>Refresh</button></div>
