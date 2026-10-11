@@ -68,7 +68,7 @@ export function FleetMapPage() {
           const online = isDeviceOnline(device, currentTime)
           const mapsUrl = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`
           return <article className="fleet-map-card" key={device.id}>
-            <div className="fleet-map-card-head"><div><p className="eyebrow">SCANNER</p><h2>{device.hive_id || device.asset_id}</h2></div><span className={online ? 'fleet-map-online' : 'fleet-map-offline'}>{online ? <Wifi size={15}/> : <WifiOff size={15}/>} {online ? 'Online' : 'Offline'}</span></div>
+            <div className="fleet-map-card-head"><div><p className="eyebrow">SCANNER</p><h2>{device.asset_id || device.hive_id}</h2></div><span className={online ? 'fleet-map-online' : 'fleet-map-offline'}>{online ? <Wifi size={15}/> : <WifiOff size={15}/>} {online ? 'Online' : 'Offline'}</span></div>
             <div className="fleet-map-meta"><span><Battery size={15}/>{device.battery_level == null ? 'Battery unknown' : `${device.battery_level}%${device.is_charging ? ' · charging' : ''}`}</span><span><MapPin size={15}/>Updated {ageLabel(location.recorded_at)}</span></div>
             <p className="fleet-map-coordinates">{location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}{location.accuracy != null ? ` · ±${Math.round(location.accuracy)}m` : ''}</p>
             <a className="primary-button fleet-map-open" href={mapsUrl} rel="noreferrer" target="_blank">Open last known location</a>
