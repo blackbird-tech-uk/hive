@@ -71,17 +71,22 @@ export function FleetMapPage() {
     return { location, device, assignment }
   }).filter((row) => row.device), [assignments, devices, locations])
 
+  const onlineCount = rows.filter(({ device }) => device && isDeviceOnline(device, currentTime)).length
+  const lowBatteryCount = rows.filter(({ device }) => device?.battery_level != null && device.battery_level <= 20).length
+  const assignedCount = rows.filter(({ assignment }) => Boolean(assignment?.assigned_location)).length
+
   return <>
     <TopBar isLoading={loading} onRefresh={() => void load()} />
     <section className="page-heading">
       <div><p className="eyebrow">FIELD TELEMETRY</p><h1>Fleet Map</h1><p>Latest reported scanner positions. Locations are timestamped and may not be live.</p></div>
     </section>
     {error && <div className="dashboard-alert" role="alert"><strong>Map data unavailable</strong><span>{error}</span></div>}
+    <section className="fleet-map-kpis" aria-label="Fleet map summary"><div><span>Reporting</span><strong>{rows.length}</strong></div><div><span>Online</span><strong>{onlineCount}</strong></div><div><span>Assigned</span><strong>{assignedCount}</strong></div><div><span>Low battery</span><strong>{lowBatteryCount}</strong></div></section>
     <section className="fleet-map-panel">
       {rows.length > 0 && <div className="fleet-map-live" aria-label="Latest scanner locations">
         <MapContainer center={[rows[0].location.latitude, rows[0].location.longitude]} zoom={17} scrollWheelZoom={false}>
           <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {rows.map(({ device, location, assignment }) => device ? <Marker key={device.id} position={[location.latitude, location.longitude]} icon={scannerIcon(device.asset_id || device.hive_id, isDeviceOnline(device, currentTime))}><Popup><strong>{device.asset_id || device.hive_id}</strong>{assignment?.assigned_location && <><br/><span className="fleet-map-area">{assignment.assigned_location}</span></>}<br/>{isDeviceOnline(device, currentTime) ? 'Online' : 'Offline'} · {device.battery_level == null ? 'Battery unknown' : `${device.battery_level}% battery`}<br/>Updated {ageLabel(location.recorded_at)}</Popup></Marker> : null)}
+          {rows.map(({ device, location, assignment }) => device ? <Marker key={device.id} position={[location.latitude, location.longitude]} icon={scannerIcon(device.asset_id || device.hive_id, isDeviceOnline(device, currentTime))}><Popup><div className="fleet-map-popup"><div className="fleet-map-popup-title"><span className={isDeviceOnline(device, currentTime) ? 'fleet-map-popup-dot is-online' : 'fleet-map-popup-dot is-offline'} /><strong>{device.asset_id || device.hive_id}</strong></div>{assignment?.assigned_location && <div className="fleet-map-popup-area"><MapPin size={13}/>{assignment.assigned_location}</div>}<div className="fleet-map-popup-meta"><span>{isDeviceOnline(device, currentTime) ? 'Online' : 'Offline'}</span><span>{device.battery_level == null ? 'Battery unknown' : `${device.battery_level}% battery`}</span><span>Updated {ageLabel(location.recorded_at)}</span></div></div></Popup></Marker> : null)}
         </MapContainer>
       </div>}
       <div className="fleet-map-summary"><MapPin size={18}/><strong>{rows.length}</strong><span>scanners reporting location</span><button className="secondary-button" onClick={() => void load()} type="button"><RefreshCw size={15}/>Refresh</button></div>
