@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
+  Map,
   QrCode,
   Settings,
   Smartphone,
@@ -30,6 +31,11 @@ const navigationItems = [
     label: 'Devices',
     to: '/devices',
     icon: Smartphone,
+  },
+  {
+    label: 'Map',
+    to: '/map',
+    icon: Map,
   },
   {
     label: 'Enrollments',
