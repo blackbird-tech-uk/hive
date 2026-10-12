@@ -4,9 +4,9 @@ import { divIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TopBar } from '../components/layout/TopBar'
-import { getAssignments, getDevices } from '../lib/api'
+import { createAssignment, getAssignments, getDevices, getEvents } from '../lib/api'
 import { getLatestDeviceLocations } from '../lib/api/locations'
-import type { Assignment, Device, DeviceLocation } from '../lib/api/types'
+import type { Assignment, Device, DeviceLocation, Event } from '../lib/api/types'
 import { isDeviceOnline } from '../lib/fleet'
 
 function scannerIcon(label: string, online: boolean) {
@@ -31,6 +31,8 @@ export function FleetMapPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [locations, setLocations] = useState<DeviceLocation[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [events, setEvents] = useState<Event[]>([])
+  const [assigningDeviceId, setAssigningDeviceId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
@@ -38,14 +40,16 @@ export function FleetMapPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [nextDevices, nextLocations, nextAssignments] = await Promise.all([
+      const [nextDevices, nextLocations, nextAssignments, nextEvents] = await Promise.all([
         getDevices(),
         getLatestDeviceLocations(),
         getAssignments(),
+        getEvents(),
       ])
       setDevices(nextDevices)
       setLocations(nextLocations)
       setAssignments(nextAssignments)
+      setEvents(nextEvents)
       setError(null)
       setCurrentTime(Date.now())
     } catch (e) {
@@ -71,6 +75,28 @@ export function FleetMapPage() {
     return { location, device, assignment }
   }).filter((row) => row.device), [assignments, devices, locations])
 
+  const assignArea = useCallback(async (device: Device) => {
+    const activeEvents = events.filter((event) => event.status === 'active' || event.status === 'planned')
+    if (activeEvents.length === 0) {
+      setError('Create or activate an event before assigning a scanner area.')
+      return
+    }
+    const event = activeEvents.length === 1 ? activeEvents[0] : activeEvents.find((candidate) => window.confirm(`Assign ${device.asset_id || device.hive_id} to ${candidate.name}?`))
+    if (!event) return
+    const area = window.prompt(`Assigned area for ${device.asset_id || device.hive_id} at ${event.name}`, 'Entrance 1')?.trim()
+    if (!area) return
+    setAssigningDeviceId(device.id)
+    try {
+      const created = await createAssignment({ device_id: device.id, event_id: event.id, assigned_location: area })
+      setAssignments((current) => [created, ...current.filter((item) => item.device_id !== device.id || item.status !== 'assigned')])
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to assign scanner area.')
+    } finally {
+      setAssigningDeviceId(null)
+    }
+  }, [events])
+
   return <>
     <TopBar isLoading={loading} onRefresh={() => void load()} />
     <section className="page-heading">
@@ -95,7 +121,7 @@ export function FleetMapPage() {
             {assignment?.assigned_location && <div className="fleet-map-assignment"><MapPin size={15}/><div><span>Assigned area</span><strong>{assignment.assigned_location}</strong></div></div>}
             <div className="fleet-map-meta"><span><Battery size={15}/>{device.battery_level == null ? 'Battery unknown' : `${device.battery_level}%${device.is_charging ? ' · charging' : ''}`}</span><span><MapPin size={15}/>Updated {ageLabel(location.recorded_at)}</span></div>
             <p className="fleet-map-coordinates">{location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}{location.accuracy != null ? ` · ±${Math.round(location.accuracy)}m` : ''}</p>
-            <a className="primary-button fleet-map-open" href={mapsUrl} rel="noreferrer" target="_blank">Open last known location</a>
+            <div className="fleet-map-actions"><button className="secondary-button" disabled={assigningDeviceId === device.id || Boolean(assignment)} onClick={() => void assignArea(device)} type="button">{assignment ? 'Area assigned' : assigningDeviceId === device.id ? 'Assigning…' : 'Assign area'}</button><a className="primary-button fleet-map-open" href={mapsUrl} rel="noreferrer" target="_blank">Open last known location</a></div>
           </article>
         })}
         {!loading && rows.length === 0 && <div className="device-search-empty"><MapPin size={28}/><h2>No scanner locations yet</h2><p>Locations will appear after an enrolled Hive Agent reports its first fix.</p></div>}
