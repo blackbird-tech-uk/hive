@@ -186,6 +186,14 @@ export interface UpdateDevicePayload {
 
 /* ---------- Assignments ---------- */
 
+export interface CreateAssignmentPayload {
+  device_id: string
+  event_id: string
+  assigned_to_name?: string | null
+  assigned_location?: string | null
+  notes?: string | null
+}
+
 export interface Assignment {
   id: string
   device_id: string
