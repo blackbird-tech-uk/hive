@@ -20,6 +20,7 @@ import com.blackbird.hiveagent.commands.CommandProcessor
 import com.blackbird.hiveagent.data.local.TokenStorage
 import com.blackbird.hiveagent.device.DeviceInfoProvider
 import com.blackbird.hiveagent.storage.TelemetryQueue
+import com.blackbird.hiveagent.scan.ScanActivityObserver
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +47,7 @@ class CommandPollingService : Service() {
     private lateinit var locationManager: LocationManager
     private lateinit var telemetryQueue: TelemetryQueue
     private var lastLocationUploadAt = 0L
+    private var scanObserver: ScanActivityObserver? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -56,6 +58,10 @@ class CommandPollingService : Service() {
             DeviceInfoProvider(applicationContext)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         telemetryQueue = TelemetryQueue(applicationContext)
+        // Safety gate: disabled until EA660/LiveScan coexistence is verified.
+        if (ENABLE_SCAN_OBSERVER_PROBE) {
+            scanObserver = ScanActivityObserver(applicationContext).also { it.start() }
+        }
         commandProcessor = CommandProcessor(
             context = applicationContext,
             apiClient = apiClient,
@@ -74,6 +80,7 @@ class CommandPollingService : Service() {
     }
 
     override fun onDestroy() {
+        scanObserver?.stop()
         serviceJob.cancel()
         super.onDestroy()
     }
@@ -333,5 +340,7 @@ class CommandPollingService : Service() {
             60_000L
 
         private const val MAX_QUEUE_FLUSH_PER_POLL = 20
+
+        private const val ENABLE_SCAN_OBSERVER_PROBE = false
     }
 }
