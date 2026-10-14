@@ -4,7 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
@@ -46,6 +49,7 @@ class CommandPollingService : Service() {
     private lateinit var locationManager: LocationManager
     private lateinit var telemetryQueue: TelemetryQueue
     private var lastLocationUploadAt = 0L
+    private lateinit var scanActivityObserver: BroadcastReceiver
 
     override fun onCreate() {
         super.onCreate()
@@ -56,6 +60,15 @@ class CommandPollingService : Service() {
             DeviceInfoProvider(applicationContext)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         telemetryQueue = TelemetryQueue(applicationContext)
+        scanActivityObserver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action != UNITECH_SCAN_DATA_ACTION) return
+                // Privacy boundary: never inspect, log, persist, or transmit barcode extras.
+                Log.d(LOG_TAG, "Unitech scan activity observed; payload discarded")
+            }
+        }
+        registerReceiver(scanActivityObserver, IntentFilter(UNITECH_SCAN_DATA_ACTION))
+
         commandProcessor = CommandProcessor(
             context = applicationContext,
             apiClient = apiClient,
@@ -74,6 +87,7 @@ class CommandPollingService : Service() {
     }
 
     override fun onDestroy() {
+        runCatching { unregisterReceiver(scanActivityObserver) }
         serviceJob.cancel()
         super.onDestroy()
     }
@@ -333,5 +347,8 @@ class CommandPollingService : Service() {
             60_000L
 
         private const val MAX_QUEUE_FLUSH_PER_POLL = 20
+
+        // Unitech ScanService read notification. Observer is intentionally read-only.
+        private const val UNITECH_SCAN_DATA_ACTION = "unitech.scanservice.data"
     }
 }
