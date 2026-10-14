@@ -11,11 +11,18 @@ val hiveApiBaseUrl =
         .orElse("http://10.0.2.2:8000/api/v1")
         .get()
 
+val scanActivityProbeEnabled =
+    providers.gradleProperty("hiveScanActivityProbe")
+        .orElse("false")
+        .get()
+        .toBoolean()
+
 android {
     namespace = "com.blackbird.hiveagent"
     compileSdk = 35
 
     defaultConfig {
+        buildConfigField("boolean", "SCAN_ACTIVITY_PROBE_ENABLED", scanActivityProbeEnabled.toString())
         applicationId = "com.blackbird.hiveagent"
         minSdk = 26
         targetSdk = 35
