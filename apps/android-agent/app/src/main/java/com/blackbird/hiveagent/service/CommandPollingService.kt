@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.blackbird.hiveagent.BuildConfig
 import com.blackbird.hiveagent.api.DeviceLocationUpload
 import com.blackbird.hiveagent.api.HiveApiClient
 import com.blackbird.hiveagent.commands.CommandProcessor
@@ -46,6 +47,7 @@ class CommandPollingService : Service() {
     private lateinit var locationManager: LocationManager
     private lateinit var telemetryQueue: TelemetryQueue
     private var lastLocationUploadAt = 0L
+    private var scanActivityProbe: ScanActivityProbe? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -61,6 +63,10 @@ class CommandPollingService : Service() {
             apiClient = apiClient,
         )
 
+        if (BuildConfig.SCAN_ACTIVITY_PROBE_ENABLED) {
+            scanActivityProbe = ScanActivityProbe(applicationContext).also { it.start() }
+        }
+
         createNotificationChannel()
 
         startForeground(
@@ -74,6 +80,7 @@ class CommandPollingService : Service() {
     }
 
     override fun onDestroy() {
+        scanActivityProbe?.stop()
         serviceJob.cancel()
         super.onDestroy()
     }
