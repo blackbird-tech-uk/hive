@@ -55,7 +55,7 @@ def upgrade() -> None:
     op.create_index("ix_assignments_map_area_id", "assignments", ["map_area_id"])
     op.execute(
         """
-        DO $
+        DO $hive$
         BEGIN
           IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
             REVOKE ALL ON map_areas FROM anon;
@@ -64,7 +64,7 @@ def upgrade() -> None:
             REVOKE ALL ON map_areas FROM authenticated;
           END IF;
         END
-        $;
+        $hive$;
         """
     )
 
