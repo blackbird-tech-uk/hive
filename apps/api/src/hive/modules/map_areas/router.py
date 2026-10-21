@@ -99,5 +99,12 @@ def delete_area(
     if area is None:
         raise HTTPException(status_code=404, detail="Area not found.")
     db.delete(area)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail='Area is assigned to a scanner and cannot be deleted.',
+        ) from exc
     return Response(status_code=204)
