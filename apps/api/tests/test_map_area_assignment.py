@@ -20,7 +20,9 @@ def setup_service(monkeypatch):
         id=device_id, organization_id=org_id, status=DeviceStatus.AVAILABLE,
     )
     service.device_repository.get_by_id = MagicMock(return_value=device)
-    service.event_repository.get_by_id = MagicMock(return_value=object())
+    service.event_repository.get_by_id = MagicMock(
+        return_value=SimpleNamespace(organization_id=org_id),
+    )
     org_service = MagicMock()
     monkeypatch.setattr(
         "hive.modules.assignments.service.OrganizationService",
@@ -65,6 +67,18 @@ def test_read_only_user_cannot_assign_area(monkeypatch):
     actor.role = UserRole.READ_ONLY
 
     with pytest.raises(PermissionError, match="Read-only"):
+        service.create(payload, actor)
+
+    db.add.assert_not_called()
+
+
+def test_rejects_event_owned_by_another_organisation(monkeypatch):
+    db, service, actor, payload, *_ = setup_service(monkeypatch)
+    service.event_repository.get_by_id.return_value = SimpleNamespace(
+        organization_id=uuid4(),
+    )
+
+    with pytest.raises(ValueError, match="Event not found for this organisation"):
         service.create(payload, actor)
 
     db.add.assert_not_called()
