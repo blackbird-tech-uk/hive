@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from hive.modules.map_areas.models import MapArea
+from hive.modules.organizations.exceptions import (
+    OrganizationAccessDeniedError,
+    OrganizationNotFoundError,
+)
+from hive.modules.organizations.service import OrganizationService
+from hive.modules.users.models import User, UserRole
 
 from hive.modules.assignments.models import Assignment
 from hive.modules.assignments.repository import AssignmentRepository
 from hive.modules.assignments.schemas import AssignmentCreate
-from hive.modules.devices.models import DeviceStatus
+from hive.modules.devices.models import Device, DeviceStatus
 from hive.modules.devices.repository import DeviceRepository
 from hive.modules.events.repository import EventRepository
 
@@ -18,14 +27,29 @@ class AssignmentService:
         self.device_repository = DeviceRepository(db)
         self.event_repository = EventRepository(db)
 
-    def list(self) -> list[Assignment]:
-        return self.assignment_repository.list()
+    def list(self, actor: User) -> list[Assignment]:
+        # Only expose assignments belonging to organisations the actor can access.
+        memberships = actor.organization_memberships
+        allowed = [m.organization_id for m in memberships if m.status.value == 'active']
+        return list(self.db.scalars(
+            select(Assignment).join(Device, Assignment.device_id == Device.id)
+            .where(Device.organization_id.in_(allowed))
+        ).all())
 
-    def create(self, payload: AssignmentCreate) -> Assignment:
+    def create(self, payload: AssignmentCreate, actor: User) -> Assignment:
         device = self.device_repository.get_by_id(payload.device_id)
 
         if device is None:
             raise ValueError("Device not found.")
+
+        try:
+            OrganizationService(self.db).get_organization_for_user(
+                organization_id=device.organization_id, actor=actor,
+            )
+        except (OrganizationAccessDeniedError, OrganizationNotFoundError) as exc:
+            raise PermissionError('Organisation access denied.') from exc
+        if actor.role == UserRole.READ_ONLY:
+            raise PermissionError('Read-only users cannot assign scanners.')
 
         event = self.event_repository.get_by_id(payload.event_id)
 
@@ -35,11 +59,22 @@ class AssignmentService:
         if device.status != DeviceStatus.AVAILABLE:
             raise ValueError("Device is not available.")
 
+        area = None
+        if payload.map_area_id is not None:
+            area = self.db.scalar(select(MapArea).where(
+                MapArea.id == payload.map_area_id,
+                MapArea.organization_id == device.organization_id,
+                MapArea.event_id == payload.event_id,
+            ))
+            if area is None:
+                raise ValueError('Allocated area not found for this organisation and event.')
+
         assignment = Assignment(
             device_id=payload.device_id,
             event_id=payload.event_id,
             assigned_to_name=payload.assigned_to_name,
-            assigned_location=payload.assigned_location,
+            map_area_id=area.id if area else None,
+            assigned_location=area.name if area else payload.assigned_location,
             notes=payload.notes,
         )
 
