@@ -3,6 +3,12 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from hive.modules.assignments.models import Assignment
+from hive.modules.assignments.repository import AssignmentRepository
+from hive.modules.assignments.schemas import AssignmentCreate
+from hive.modules.devices.models import Device, DeviceStatus
+from hive.modules.devices.repository import DeviceRepository
+from hive.modules.events.repository import EventRepository
 from hive.modules.map_areas.models import MapArea
 from hive.modules.organizations.exceptions import (
     OrganizationAccessDeniedError,
@@ -10,13 +16,6 @@ from hive.modules.organizations.exceptions import (
 )
 from hive.modules.organizations.service import OrganizationService
 from hive.modules.users.models import User, UserRole
-
-from hive.modules.assignments.models import Assignment
-from hive.modules.assignments.repository import AssignmentRepository
-from hive.modules.assignments.schemas import AssignmentCreate
-from hive.modules.devices.models import Device, DeviceStatus
-from hive.modules.devices.repository import DeviceRepository
-from hive.modules.events.repository import EventRepository
 
 
 class AssignmentService:
