@@ -4,6 +4,7 @@ import { divIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TopBar } from '../components/layout/TopBar'
+import { FleetMapFeatures } from '../components/FleetMapFeatures'
 import { createAssignment, getAssignments, getDevices, getEvents } from '../lib/api'
 import { getLatestDeviceLocations } from '../lib/api/locations'
 import type { Assignment, Device, DeviceLocation, Event } from '../lib/api/types'
@@ -33,6 +34,8 @@ export function FleetMapPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [assigningDeviceId, setAssigningDeviceId] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState('')
+  const [selectedDeviceId, setSelectedDeviceId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
@@ -75,15 +78,15 @@ export function FleetMapPage() {
     return { location, device, assignment }
   }).filter((row) => row.device), [assignments, devices, locations])
 
-  const assignArea = useCallback(async (device: Device) => {
+  const assignArea = useCallback(async (device: Device, namedArea?: string) => {
     const activeEvents = events.filter((event) => event.status === 'active' || event.status === 'planned')
     if (activeEvents.length === 0) {
       setError('Create or activate an event before assigning a scanner area.')
       return
     }
-    const event = activeEvents.length === 1 ? activeEvents[0] : activeEvents.find((candidate) => window.confirm(`Assign ${device.asset_id || device.hive_id} to ${candidate.name}?`))
+    const event = (selectedEventId && activeEvents.find((candidate) => candidate.id === selectedEventId)) || (activeEvents.length === 1 ? activeEvents[0] : activeEvents.find((candidate) => window.confirm(`Assign ${device.asset_id || device.hive_id} to ${candidate.name}?`)))
     if (!event) return
-    const area = window.prompt(`Assigned area for ${device.asset_id || device.hive_id} at ${event.name}`, 'Entrance 1')?.trim()
+    const area = namedArea || window.prompt(`Assigned area for ${device.asset_id || device.hive_id} at ${event.name}`, 'Entrance 1')?.trim()
     if (!area) return
     setAssigningDeviceId(device.id)
     try {
@@ -95,7 +98,12 @@ export function FleetMapPage() {
     } finally {
       setAssigningDeviceId(null)
     }
-  }, [events])
+  }, [events, selectedEventId])
+
+  const activeEvents = events.filter((event) => event.status === 'active' || event.status === 'planned')
+  const activeEventId = selectedEventId || activeEvents[0]?.id || null
+  const selectedDevice = devices.find((device) => device.id === selectedDeviceId)
+  const selectedAssignment = assignments.find((item) => item.device_id === selectedDeviceId && item.status === 'assigned')
 
   return <>
     <TopBar isLoading={loading} onRefresh={() => void load()} />
@@ -104,8 +112,10 @@ export function FleetMapPage() {
     </section>
     {error && <div className="dashboard-alert" role="alert"><strong>Map data unavailable</strong><span>{error}</span></div>}
     <section className="fleet-map-panel">
+      <div className="fleet-area-event-select"><label htmlFor="fleet-map-event">Event for map areas</label><select id="fleet-map-event" value={activeEventId || ''} onChange={(event) => setSelectedEventId(event.target.value)}><option value="">Select event</option>{activeEvents.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}</select><label htmlFor="fleet-map-device">Scanner to assign</label><select id="fleet-map-device" value={selectedDeviceId} onChange={(event) => setSelectedDeviceId(event.target.value)}><option value="">Select scanner</option>{devices.map((device) => <option key={device.id} value={device.id}>{device.asset_id || device.hive_id}</option>)}</select></div>
       {rows.length > 0 && <div className="fleet-map-live" aria-label="Latest scanner locations">
         <MapContainer center={[rows[0].location.latitude, rows[0].location.longitude]} zoom={17} scrollWheelZoom={false}>
+          <FleetMapFeatures eventId={activeEventId} deviceName={selectedDevice?.asset_id || selectedDevice?.hive_id} assignedArea={selectedAssignment?.assigned_location} onAssign={async (name) => { if (selectedDevice) await assignArea(selectedDevice, name) }} />
           <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {rows.map(({ device, location, assignment }) => device ? <Marker key={device.id} position={[location.latitude, location.longitude]} icon={scannerIcon(device.asset_id || device.hive_id, isDeviceOnline(device, currentTime))}><Popup><strong>{device.asset_id || device.hive_id}</strong>{assignment?.assigned_location && <><br/><span className="fleet-map-area">{assignment.assigned_location}</span></>}<br/>{isDeviceOnline(device, currentTime) ? 'Online' : 'Offline'} · {device.battery_level == null ? 'Battery unknown' : `${device.battery_level}% battery`}<br/>Updated {ageLabel(location.recorded_at)}</Popup></Marker> : null)}
         </MapContainer>
