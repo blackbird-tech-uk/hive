@@ -20,11 +20,14 @@ def test_event_list_only_returns_accessible_tenant(monkeypatch):
         organization=SimpleNamespace(status=OrganizationStatus.ACTIVE),
     )
     actor = SimpleNamespace(id=uuid4(), organization_memberships=[membership])
-    events = [
-        SimpleNamespace(id=uuid4(), organization_id=org_a),
-        SimpleNamespace(id=uuid4(), organization_id=org_b),
-        SimpleNamespace(id=uuid4(), organization_id=None),
-    ]
+    def event(organization_id):
+        return SimpleNamespace(
+            id=uuid4(), organization_id=organization_id, name="Example",
+            venue="Test", start_date="2026-11-01", end_date="2026-11-02",
+            status="planned", notes=None,
+        )
+
+    events = [event(org_a), event(org_b), event(None)]
     monkeypatch.setattr(
         "hive.modules.events.router.EventService.list_events",
         lambda _self: events,
