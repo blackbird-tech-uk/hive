@@ -13,17 +13,28 @@ from hive.modules.auth.dependencies import CurrentUser
 from hive.modules.events.models import Event
 from hive.modules.map_areas.models import MapArea
 from hive.modules.map_areas.schemas import MapAreaCreate, MapAreaResponse
-from hive.modules.organizations.exceptions import OrganizationAccessDeniedError, OrganizationNotFoundError
+from hive.modules.organizations.exceptions import (
+    OrganizationAccessDeniedError,
+    OrganizationNotFoundError,
+)
 from hive.modules.organizations.service import OrganizationService
 from hive.modules.users.models import UserRole
 
-router = APIRouter(prefix="/organizations/{organization_id}/events/{event_id}/map-areas", tags=["Map Areas"])
+router = APIRouter(
+    prefix="/organizations/{organization_id}/events/{event_id}/map-areas",
+    tags=["Map Areas"],
+)
 DatabaseSession = Annotated[Session, Depends(get_db)]
 
 
-def check_access(db: Session, actor, organization_id: UUID, event_id: UUID, write: bool = False):
+def check_access(
+    db: Session, actor, organization_id: UUID, event_id: UUID,
+    write: bool = False,
+):
     try:
-        OrganizationService(db).get_organization_for_user(organization_id=organization_id, actor=actor)
+        OrganizationService(db).get_organization_for_user(
+            organization_id=organization_id, actor=actor,
+        )
     except (OrganizationNotFoundError, OrganizationAccessDeniedError):
         raise HTTPException(status_code=404, detail="Organization not found.")
     # Events are currently global in HIVE: restrict map-area access by organization membership.
@@ -34,29 +45,57 @@ def check_access(db: Session, actor, organization_id: UUID, event_id: UUID, writ
 
 
 @router.get("", response_model=list[MapAreaResponse])
-def list_areas(organization_id: UUID, event_id: UUID, db: DatabaseSession, actor: CurrentUser):
+def list_areas(
+    organization_id: UUID, event_id: UUID,
+    db: DatabaseSession, actor: CurrentUser,
+):
     check_access(db, actor, organization_id, event_id)
-    return db.scalars(select(MapArea).where(MapArea.organization_id == organization_id, MapArea.event_id == event_id).order_by(MapArea.name)).all()
+    return db.scalars(
+        select(MapArea).where(
+            MapArea.organization_id == organization_id,
+            MapArea.event_id == event_id,
+        ).order_by(MapArea.name)
+    ).all()
 
 
 @router.post("", response_model=MapAreaResponse, status_code=status.HTTP_201_CREATED)
-def create_area(organization_id: UUID, event_id: UUID, payload: MapAreaCreate, db: DatabaseSession, actor: CurrentUser):
+def create_area(
+    organization_id: UUID, event_id: UUID, payload: MapAreaCreate,
+    db: DatabaseSession, actor: CurrentUser,
+):
     check_access(db, actor, organization_id, event_id, write=True)
-    area = MapArea(organization_id=organization_id, event_id=event_id, name=payload.name.strip(), points=[list(p) for p in payload.points])
+    area = MapArea(
+        organization_id=organization_id,
+        event_id=event_id,
+        name=payload.name.strip(),
+        points=[list(p) for p in payload.points],
+    )
     db.add(area)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="An area with this name already exists for this event.")
+        raise HTTPException(
+            status_code=409,
+            detail="An area with this name already exists for this event.",
+        )
     db.refresh(area)
     return area
 
 
 @router.delete("/{area_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_area(organization_id: UUID, event_id: UUID, area_id: UUID, db: DatabaseSession, actor: CurrentUser):
+def delete_area(
+    organization_id: UUID, event_id: UUID, area_id: UUID,
+    db: DatabaseSession, actor: CurrentUser,
+):
     check_access(db, actor, organization_id, event_id, write=True)
-    area = db.scalar(select(MapArea).where(MapArea.id == area_id, MapArea.organization_id == organization_id, MapArea.event_id == event_id))
+    area = db.scalar(
+        select(MapArea).where(
+            MapArea.id == area_id,
+            MapArea.organization_id == organization_id,
+            MapArea.event_id == event_id,
+        )
+    )
     if area is None:
         raise HTTPException(status_code=404, detail="Area not found.")
     db.delete(area)
