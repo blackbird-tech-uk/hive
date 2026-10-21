@@ -39,7 +39,7 @@ export function FleetMapFeatures({
     if (!eventId || !name.trim() || points.length < 3) return
     setLoading(true)
     try {
-      const area = await createMapArea(eventId, { name: name.trim(), points })
+      const area = await createMapArea(eventId, { name: name.trim(), points: points.map(([lat, lng]): [number, number] => [lat, lng]) })
       setFeatures((old) => [...old, area]); setMode('idle'); setPoints([]); setName(''); setError('')
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save area') }
     finally { setLoading(false) }
