@@ -19,8 +19,8 @@ router = APIRouter(
 
 @router.get("", response_model=list[AssignmentResponse])
 def list_assignments(
-    db: Session = Depends(get_db),
     actor: CurrentUser,
+    db: Session = Depends(get_db),
 ) -> list[AssignmentResponse]:
     service = AssignmentService(db)
     return service.list(actor)
