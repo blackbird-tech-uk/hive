@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from math import isfinite
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -14,7 +15,10 @@ class MapAreaCreate(BaseModel):
     def validate_coordinates(self):
         if not self.name.strip():
             raise ValueError("Area name cannot be blank.")
-        if any(not (-90 <= lat <= 90 and -180 <= lng <= 180) for lat, lng in self.points):
+        if any(
+            not (isfinite(lat) and isfinite(lng) and -90 <= lat <= 90 and -180 <= lng <= 180)
+            for lat, lng in self.points
+        ):
             raise ValueError("Coordinates must be valid latitude/longitude pairs.")
         return self
 
