@@ -1,6 +1,5 @@
 from fastapi import APIRouter
 
-from hive.modules.map_areas.router import router as map_areas_router
 from hive.modules.assignments.router import router as assignments_router
 from hive.modules.auth.router import router as auth_router
 from hive.modules.device_agent.router import router as device_agent_router
@@ -19,6 +18,7 @@ from hive.modules.enrollment.router import (
 )
 from hive.modules.events.router import router as events_router
 from hive.modules.inventory.router import router as inventory_router
+from hive.modules.map_areas.router import router as map_areas_router
 from hive.modules.organizations.router import (
     router as organizations_router,
 )
