@@ -18,6 +18,7 @@ class AssignmentCreate(BaseModel):
     device_id: uuid.UUID
     event_id: uuid.UUID
 
+    map_area_id: uuid.UUID | None = None
     assigned_to_name: str | None = Field(default=None, max_length=150)
     assigned_location: str | None = Field(default=None, max_length=150)
     notes: str | None = None
@@ -31,6 +32,7 @@ class AssignmentResponse(BaseModel):
     device_id: uuid.UUID
     event_id: uuid.UUID
 
+    map_area_id: uuid.UUID | None
     assigned_to_name: str | None
     assigned_location: str | None
 
