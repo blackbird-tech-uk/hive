@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from math import isfinite
 from datetime import datetime
+from math import isfinite
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
