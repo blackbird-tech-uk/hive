@@ -36,7 +36,7 @@ def check_access(
             organization_id=organization_id, actor=actor,
         )
     except (OrganizationNotFoundError, OrganizationAccessDeniedError):
-        raise HTTPException(status_code=404, detail="Organization not found.")
+        raise HTTPException(status_code=404, detail="Organization not found.") from None
     # Events are currently global in HIVE: restrict map-area access by organization membership.
     if db.get(Event, event_id) is None:
         raise HTTPException(status_code=404, detail="Event not found.")
@@ -78,7 +78,7 @@ def create_area(
         raise HTTPException(
             status_code=409,
             detail="An area with this name already exists for this event.",
-        )
+        ) from None
     db.refresh(area)
     return area
 
