@@ -53,7 +53,20 @@ def upgrade() -> None:
         ["map_area_id"], ["id"], ondelete="RESTRICT",
     )
     op.create_index("ix_assignments_map_area_id", "assignments", ["map_area_id"])
-    op.execute("REVOKE ALL ON map_areas FROM anon, authenticated")
+    op.execute(
+        """
+        DO $
+        BEGIN
+          IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+            REVOKE ALL ON map_areas FROM anon;
+          END IF;
+          IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+            REVOKE ALL ON map_areas FROM authenticated;
+          END IF;
+        END
+        $;
+        """
+    )
 
 
 def downgrade() -> None:
