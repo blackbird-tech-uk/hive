@@ -52,8 +52,8 @@ class AssignmentService:
 
         event = self.event_repository.get_by_id(payload.event_id)
 
-        if event is None:
-            raise ValueError("Event not found.")
+        if event is None or event.organization_id != device.organization_id:
+            raise ValueError("Event not found for this organisation.")
 
         if device.status != DeviceStatus.AVAILABLE:
             raise ValueError("Device is not available.")
