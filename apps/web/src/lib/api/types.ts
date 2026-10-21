@@ -219,6 +219,7 @@ export type EventStatus =
   | 'archived'
 
 export interface Event {
+  organization_id: string | null
   id: string
 
   name: string
@@ -233,6 +234,7 @@ export interface Event {
 }
 
 export interface CreateEventPayload {
+  organization_id?: string | null
   name: string
   venue: string
 
