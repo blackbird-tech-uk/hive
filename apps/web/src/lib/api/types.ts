@@ -187,6 +187,7 @@ export interface UpdateDevicePayload {
 /* ---------- Assignments ---------- */
 
 export interface CreateAssignmentPayload {
+  map_area_id?: string | null
   device_id: string
   event_id: string
   assigned_to_name?: string | null
@@ -195,6 +196,7 @@ export interface CreateAssignmentPayload {
 }
 
 export interface Assignment {
+  map_area_id: string | null
   id: string
   device_id: string
   event_id: string
