@@ -34,6 +34,8 @@ def render_sql(operation: str) -> str:
 
 def test_upgrade_compiles_postgresql_ddl():
     sql = render_sql("upgrade")
+    assert "ALTER TABLE events ADD COLUMN organization_id" in sql
+    assert "UPDATE events SET organization_id" in sql
     assert "CREATE TABLE map_areas" in sql
     assert "ALTER TABLE assignments ADD COLUMN map_area_id" in sql
     assert "fk_assignments_map_area_id" in sql
@@ -45,4 +47,5 @@ def test_upgrade_compiles_postgresql_ddl():
 def test_downgrade_compiles_postgresql_ddl():
     sql = render_sql("downgrade")
     assert "DROP TABLE map_areas" in sql
+    assert "DROP COLUMN organization_id" in sql
     assert "DROP COLUMN map_area_id" in sql
