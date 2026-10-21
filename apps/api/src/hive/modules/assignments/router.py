@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from hive.db.session import get_db
-from hive.modules.auth.dependencies import CurrentUser
 from hive.modules.assignments.schemas import (
     AssignmentCreate,
     AssignmentResponse,
 )
 from hive.modules.assignments.service import AssignmentService
+from hive.modules.auth.dependencies import CurrentUser
 
 router = APIRouter(
     prefix="/assignments",
@@ -33,8 +33,8 @@ def list_assignments(
 )
 def create_assignment(
     payload: AssignmentCreate,
+    actor: CurrentUser,
     db: Session = Depends(get_db),
-    actor: CurrentUser = None,
 ) -> AssignmentResponse:
     service = AssignmentService(db)
 
