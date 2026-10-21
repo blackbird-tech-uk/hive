@@ -67,7 +67,7 @@ export function FleetMapFeatures({
       {deviceName && !assignedArea && visible.length > 0 && <div className="fleet-area-controls">
         <label htmlFor="fleet-area-assignment">Assign {deviceName} to a map area</label>
         <select id="fleet-area-assignment" value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">Choose area</option>{visible.map((feature) => <option key={feature.id} value={feature.id}>{feature.name}</option>)}</select>
-        <button type="button" className="secondary-button" disabled={!selected || saving} onClick={async () => { setSaving(true); try { const area = visible.find((feature) => feature.id === selected); if (area) { await onAssign(area); setSelected('') } } finally { setSaving(false) } }}>{saving ? 'Assigning…' : 'Assign scanner'}</button>
+        <button type="button" className="secondary-button" disabled={!selected || saving} onClick={async () => { setSaving(true); try { const area = visible.find((feature) => feature.id === selected); if (area) { await onAssign(area); setSelected(''); setError('') } } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not assign scanner') } finally { setSaving(false) } }}>{saving ? 'Assigning…' : 'Assign scanner'}</button>
       </div>}
       <small>Area boundaries are saved to HIVE and shared with authorised users of this organisation.</small>
     </div>
