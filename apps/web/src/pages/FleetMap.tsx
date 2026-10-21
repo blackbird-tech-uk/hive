@@ -85,7 +85,7 @@ export function FleetMapPage() {
       setError('Create or activate an event before assigning a scanner area.')
       return
     }
-    const event = (selectedEventId && activeEvents.find((candidate) => candidate.id === selectedEventId)) || (activeEvents.length === 1 ? activeEvents[0] : activeEvents.find((candidate) => window.confirm(`Assign ${device.asset_id || device.hive_id} to ${candidate.name}?`)))
+    const event = (mapArea && activeEvents.find((candidate) => candidate.id === mapArea.event_id)) || (selectedEventId && activeEvents.find((candidate) => candidate.id === selectedEventId)) || (activeEvents.length === 1 ? activeEvents[0] : activeEvents.find((candidate) => window.confirm(`Assign ${device.asset_id || device.hive_id} to ${candidate.name}?`)))
     if (!event) return
     const area = mapArea?.name || window.prompt(`Assigned area for ${device.asset_id || device.hive_id} at ${event.name}`, 'Entrance 1')?.trim()
     if (!area) return
