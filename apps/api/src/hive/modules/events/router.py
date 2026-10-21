@@ -14,6 +14,7 @@ from hive.modules.events.schemas import (
 )
 from hive.modules.events.service import EventNotFoundError, EventService
 
+
 def accessible_orgs(actor: CurrentUser) -> set[uuid.UUID]:
     return {
         membership.organization_id
@@ -45,7 +46,8 @@ def create_event(
         organization_id = next(iter(allowed))
     if organization_id not in allowed:
         raise HTTPException(status_code=403, detail='Select an accessible organisation.')
-    return EventService(db).create_event(payload.model_copy(update={'organization_id': organization_id}))
+    scoped_payload = payload.model_copy(update={'organization_id': organization_id})
+    return EventService(db).create_event(scoped_payload)
 
 
 @router.get(
