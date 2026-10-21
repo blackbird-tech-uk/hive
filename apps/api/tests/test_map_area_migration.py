@@ -11,7 +11,6 @@ from pathlib import Path
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 
-
 MIGRATION = (
     Path(__file__).resolve().parents[1]
     / "alembic/versions/f31a6b8c02e4_add_event_map_areas.py"
