@@ -17,6 +17,19 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # Backfill legacy events only when the database has exactly one tenant.
+    # Unowned events in multi-tenant installations remain inaccessible.
+    op.add_column("events", sa.Column("organization_id", sa.UUID(), nullable=True))
+    op.create_foreign_key(
+        "fk_events_organization_id", "events", "organizations",
+        ["organization_id"], ["id"], ondelete="RESTRICT",
+    )
+    op.create_index("ix_events_organization_id", "events", ["organization_id"])
+    op.execute(
+        "UPDATE events SET organization_id = (SELECT id FROM organizations LIMIT 1) "
+        "WHERE organization_id IS NULL "
+        "AND (SELECT count(*) FROM organizations) = 1"
+    )
     op.create_table(
         "map_areas",
         sa.Column("id", sa.UUID(), primary_key=True),
@@ -76,3 +89,6 @@ def downgrade() -> None:
     op.drop_index("ix_map_areas_event_id", table_name="map_areas")
     op.drop_index("ix_map_areas_organization_id", table_name="map_areas")
     op.drop_table("map_areas")
+    op.drop_index("ix_events_organization_id", table_name="events")
+    op.drop_constraint("fk_events_organization_id", "events", type_="foreignkey")
+    op.drop_column("events", "organization_id")
