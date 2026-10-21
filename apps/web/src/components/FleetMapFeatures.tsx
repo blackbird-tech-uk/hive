@@ -49,7 +49,7 @@ export function FleetMapFeatures({
   }
   const save = () => {
     if (!eventId || !name.trim() || points.length < 3) return
-    setFeatures((old) => [...old, { id: crypto.randomUUID(), eventId, name: name.trim(), kind: mode, points }])
+    setFeatures((old) => [...old, { id: crypto.randomUUID(), eventId, name: name.trim(), kind: 'zone', points }])
     setMode('idle'); setPoints([]); setName('')
   }
   const cancel = () => { setMode('idle'); setPoints([]); setName('') }
