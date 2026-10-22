@@ -9,11 +9,11 @@ function MapClickCapture({ onPoint }: { onPoint: (point: LatLngTuple) => void })
 }
 
 export function FleetMapFeatures({
-  eventId, onAssign, assignedArea, deviceName,
+  eventId, onAssign, assignedAreaId, deviceName,
 }: {
   eventId: string | null
   onAssign: (area: MapArea) => Promise<void>
-  assignedArea?: string | null
+  assignedAreaId?: string | null
   deviceName?: string
 }) {
   const [features, setFeatures] = useState<MapArea[]>([])
@@ -27,6 +27,10 @@ export function FleetMapFeatures({
 
   useEffect(() => {
     let active = true
+    setFeatures([])
+    setSelected('')
+    setPoints([])
+    setMode('idle')
     if (!eventId) return
     getMapAreas(eventId).then((areas) => { if (active) { setFeatures(areas); setError('') } }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Could not load areas') })
     return () => { active = false }
@@ -64,7 +68,7 @@ export function FleetMapFeatures({
       {visible.length > 0 && <div className="fleet-area-list">{visible.map((feature) =>
         <div key={feature.id}><span>▱ {feature.name}</span><button type="button" aria-label={`Delete ${feature.name}`} onClick={async () => { if (!eventId) return; try { await deleteMapArea(eventId, feature.id); setFeatures((old) => old.filter((item) => item.id !== feature.id)); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete area') } }}>Remove</button></div>
       )}</div>}
-      {deviceName && !assignedArea && visible.length > 0 && <div className="fleet-area-controls">
+      {deviceName && !assignedAreaId && visible.length > 0 && <div className="fleet-area-controls">
         <label htmlFor="fleet-area-assignment">Assign {deviceName} to a map area</label>
         <select id="fleet-area-assignment" value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">Choose area</option>{visible.map((feature) => <option key={feature.id} value={feature.id}>{feature.name}</option>)}</select>
         <button type="button" className="secondary-button" disabled={!selected || saving} onClick={async () => { setSaving(true); try { const area = visible.find((feature) => feature.id === selected); if (area) { await onAssign(area); setSelected(''); setError('') } } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not assign scanner') } finally { setSaving(false) } }}>{saving ? 'Assigning…' : 'Assign scanner'}</button>
