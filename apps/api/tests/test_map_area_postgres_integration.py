@@ -13,14 +13,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.orm import Session
 
+from hive.core.config import settings
 from hive.db.session import get_db
 from hive.main import app
-from hive.modules.auth.dependencies import get_current_user
-
-from hive.core.config import settings
 from hive.modules.assignments.models import Assignment
 from hive.modules.assignments.schemas import AssignmentCreate
 from hive.modules.assignments.service import AssignmentService
+from hive.modules.auth.dependencies import get_current_user
 from hive.modules.devices.models import Device
 from hive.modules.events.models import Event
 from hive.modules.map_areas.models import MapArea
