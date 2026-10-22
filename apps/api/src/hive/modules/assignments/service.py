@@ -36,7 +36,7 @@ class AssignmentService:
         ).all())
 
     def create(self, payload: AssignmentCreate, actor: User) -> Assignment:
-        device = self.device_repository.get_by_id(payload.device_id)
+        device = self.db.get(Device, payload.device_id)
 
         if device is None:
             raise ValueError("Device not found.")
