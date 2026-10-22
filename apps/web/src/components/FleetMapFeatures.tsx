@@ -19,6 +19,7 @@ export function FleetMapFeatures({
   const [features, setFeatures] = useState<MapArea[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [fetching, setFetching] = useState(false)
   const [mode, setMode] = useState<'idle' | 'zone'>('idle')
   const [points, setPoints] = useState<LatLngTuple[]>([])
   const [name, setName] = useState('')
@@ -31,8 +32,10 @@ export function FleetMapFeatures({
     setSelected('')
     setPoints([])
     setMode('idle')
+    setError('')
+    setFetching(Boolean(eventId))
     if (!eventId) return
-    getMapAreas(eventId).then((areas) => { if (active) { setFeatures(areas); setError('') } }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Could not load areas') })
+    getMapAreas(eventId).then((areas) => { if (active) { setFeatures(areas); setError('') } }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Could not load areas') }).finally(() => { if (active) setFetching(false) })
     return () => { active = false }
   }, [eventId])
   const visible = features.filter((feature) => feature.event_id === eventId)
@@ -54,9 +57,10 @@ export function FleetMapFeatures({
     <div className="fleet-area-editor">
       <strong>Allocated areas</strong>
       {error && <span role="alert">{error}</span>}
+      {fetching && <span role="status">Loading saved areas…</span>}
       {!eventId && <span>Select an active or planned event to edit its map areas.</span>}
       <div className="fleet-area-toolbar">
-        <button type="button" className="secondary-button" disabled={!eventId} onClick={() => { setMode('zone'); setPoints([]) }}>Draw allocated area</button>
+        <button type="button" className="secondary-button" disabled={!eventId || fetching} onClick={() => { setMode('zone'); setPoints([]) }}>Draw allocated area</button>
         {mode !== 'idle' && <button type="button" className="secondary-button" onClick={cancel}>Cancel</button>}
       </div>
       {mode !== 'idle' && <div className="fleet-area-controls">
@@ -65,6 +69,7 @@ export function FleetMapFeatures({
         <span>Click at least three map points to outline the allocated area. {points.length} point(s) selected.</span>
         <button type="button" className="secondary-button" onClick={save} disabled={loading || !name.trim() || points.length < 3}>Save area</button>
       </div>}
+      {!fetching && eventId && visible.length === 0 && !error && <small>No saved areas for this event yet.</small>}
       {visible.length > 0 && <div className="fleet-area-list">{visible.map((feature) =>
         <div key={feature.id}><span>▱ {feature.name}</span><button type="button" aria-label={`Delete ${feature.name}`} onClick={async () => { if (!eventId) return; try { await deleteMapArea(eventId, feature.id); setFeatures((old) => old.filter((item) => item.id !== feature.id)); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete area') } }}>Remove</button></div>
       )}</div>}
