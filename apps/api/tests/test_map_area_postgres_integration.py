@@ -9,9 +9,9 @@ from datetime import date
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.orm import Session
-from fastapi.testclient import TestClient
 
 from hive.db.session import get_db
 from hive.main import app
