@@ -66,7 +66,15 @@ def test_real_postgres_upgrade_tenant_isolation_and_downgrade(monkeypatch):
     assert "organization_id" in {c["name"] for c in inspector.get_columns("events")}
 
     with Session(engine) as db:
-        assert db.get(Event, event_id).organization_id == org_id
+        # Migration must not guess ownership when multiple tenants exist.
+        organisation_count = db.scalar(text("SELECT count(*) FROM organizations"))
+        event = db.get(Event, event_id)
+        if organisation_count == 1:
+            assert event.organization_id == org_id
+        else:
+            assert event.organization_id is None
+            event.organization_id = org_id
+            db.commit()
         actor = User(
             username="isolated_user", display_name="Isolated", job_title="Tester",
             role=UserRole.SYSTEM_ADMINISTRATOR, password_hash="test-only",
