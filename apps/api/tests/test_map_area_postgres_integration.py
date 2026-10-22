@@ -11,6 +11,11 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.orm import Session
+from fastapi.testclient import TestClient
+
+from hive.db.session import get_db
+from hive.main import app
+from hive.modules.auth.dependencies import get_current_user
 
 from hive.core.config import settings
 from hive.modules.assignments.models import Assignment
@@ -101,6 +106,32 @@ def test_real_postgres_upgrade_tenant_isolation_and_downgrade(monkeypatch):
         db.refresh(scanner)
         db.refresh(area)
         db.refresh(foreign_area)
+
+        # Exercise real HTTP routes against the same isolated database.
+        app.dependency_overrides[get_db] = lambda: db
+        app.dependency_overrides[get_current_user] = lambda: actor
+        try:
+            client = TestClient(app)
+            base = f"/api/v1/organizations/{org_id}/events/{event_id}/map-areas"
+            created = client.post(
+                base,
+                json={
+                    "name": "Help Desk",
+                    "points": [[52.4, -1.5], [52.41, -1.5], [52.41, -1.49]],
+                },
+            )
+            assert created.status_code == 201, created.text
+            listed = client.get(base)
+            assert listed.status_code == 200
+            assert {item["name"] for item in listed.json()} == {
+                "Registration A", "Help Desk",
+            }
+            forbidden = client.get(
+                f"/api/v1/organizations/{foreign_org_id}/events/{event_id}/map-areas",
+            )
+            assert forbidden.status_code == 404
+        finally:
+            app.dependency_overrides.clear()
 
         service = AssignmentService(db)
         with pytest.raises(ValueError, match="Allocated area not found"):
