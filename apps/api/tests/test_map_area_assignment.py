@@ -19,7 +19,7 @@ def setup_service(monkeypatch):
     device = SimpleNamespace(
         id=device_id, organization_id=org_id, status=DeviceStatus.AVAILABLE,
     )
-    service.device_repository.get_by_id = MagicMock(return_value=device)
+    db.get.return_value = device
     service.event_repository.get_by_id = MagicMock(
         return_value=SimpleNamespace(organization_id=org_id),
     )
