@@ -20,11 +20,6 @@ class HeartbeatWorker(
     private val tokenStorage = TokenStorage(appContext)
     private val preferences = AgentPreferences(appContext)
     private val deviceInfoProvider = DeviceInfoProvider(appContext)
-    private val apiClient = HiveApiClient()
-   private val commandProcessor = CommandProcessor(
-    context = appContext,
-    apiClient = apiClient,
-)
 
     override suspend fun doWork(): Result {
         Log.d(
@@ -56,6 +51,11 @@ class HeartbeatWorker(
         )
 
         return try {
+            val apiClient = HiveApiClient(tokenStorage.getServerUrl())
+            val commandProcessor = CommandProcessor(
+                context = applicationContext,
+                apiClient = apiClient,
+            )
             Log.d(
                 LOG_TAG,
                 "Creating heartbeat payload",
