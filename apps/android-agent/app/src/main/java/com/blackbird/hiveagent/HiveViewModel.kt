@@ -23,6 +23,7 @@ data class HiveUiState(
     val isEnrolling: Boolean = false,
     val isEnrolled: Boolean = false,
     val device: DeviceAgentResponse? = null,
+    val hasStoredEnrolment: Boolean = false,
     val error: String? = null,
 )
 
@@ -51,9 +52,12 @@ class HiveViewModel(
             "Loading local enrolment",
         )
 
+        // A refresh is not an unenrolment. Keep the running command
+        // service active until credentials are explicitly removed.
         _uiState.value =
-            HiveUiState(
+            _uiState.value.copy(
                 isLoading = true,
+                error = null,
             )
 
         try {
@@ -254,28 +258,6 @@ loadDeviceWithToken(
     serverUrl = storedServerUrl,
 )
 
-                if (storedToken.isNullOrBlank()) {
-                    throw IllegalStateException(
-                        "The device token could not be read after saving.",
-                    )
-                }
-
-                if (storedToken != deviceToken) {
-                    throw IllegalStateException(
-                        "The stored device token does not match " +
-                                "the enrolment response.",
-                    )
-                }
-
-                Log.d(
-                    LOG_TAG,
-                    "Device token saved and verified",
-                )
-
-              loadDeviceWithToken(
-    deviceToken = storedToken,
-    serverUrl = storedServerUrl,
-)
             } catch (error: Exception) {
                 Log.e(
                     LOG_TAG,
@@ -344,6 +326,7 @@ loadDeviceWithToken(
                     isLoading = false,
                     isEnrolled = true,
                     device = device,
+                    hasStoredEnrolment = true,
                 )
 
             /*
@@ -359,38 +342,18 @@ loadDeviceWithToken(
                 "Heartbeat scheduled after device authentication",
             )
         } catch (error: Exception) {
-            if (
-                error is HttpException &&
-                error.code() == 401
-            ) {
-                Log.e(
-                    LOG_TAG,
-                    "Hive rejected the stored device token with HTTP 401",
-                    error,
-                )
-
-                HeartbeatScheduler.cancel(
-                    applicationContext,
-                )
-
-                tokenStorage.clearDeviceToken()
-
-                Log.e(
-                    LOG_TAG,
-                    "Invalid device token removed from local storage",
-                )
-            } else {
-                Log.e(
-                    LOG_TAG,
-                    "Could not load device from Hive",
-                    error,
-                )
-            }
-
+            // An authentication or connectivity failure is not an unenrolment.
+            // Keep the saved credentials until the user explicitly removes them.
+            Log.e(
+                LOG_TAG,
+                "Device validation failed; retaining local enrolment",
+                error,
+            )
             _uiState.value =
                 HiveUiState(
                     isLoading = false,
                     isEnrolled = false,
+                    hasStoredEnrolment = true,
                     error = readableError(error),
                 )
         }

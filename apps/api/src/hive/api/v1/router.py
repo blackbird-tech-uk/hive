@@ -18,6 +18,7 @@ from hive.modules.enrollment.router import (
 )
 from hive.modules.events.router import router as events_router
 from hive.modules.inventory.router import router as inventory_router
+from hive.modules.map_areas.router import router as map_areas_router
 from hive.modules.organizations.router import (
     router as organizations_router,
 )
@@ -49,3 +50,5 @@ api_router.include_router(organizations_router)
 api_router.include_router(realtime_router)
 api_router.include_router(device_commands_router)
 api_router.include_router(inventory_router)
+
+api_router.include_router(map_areas_router)
