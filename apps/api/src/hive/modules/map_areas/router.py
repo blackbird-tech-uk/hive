@@ -84,6 +84,32 @@ def create_area(
     return area
 
 
+@router.put("/{area_id}", response_model=MapAreaResponse)
+def update_area(
+    organization_id: UUID, event_id: UUID, area_id: UUID, payload: MapAreaCreate,
+    db: DatabaseSession, actor: CurrentUser,
+):
+    check_access(db, actor, organization_id, event_id, write=True)
+    area = db.scalar(
+        select(MapArea).where(
+            MapArea.id == area_id,
+            MapArea.organization_id == organization_id,
+            MapArea.event_id == event_id,
+        )
+    )
+    if area is None:
+        raise HTTPException(status_code=404, detail="Area not found.")
+    area.name = payload.name.strip()
+    area.points = [list(point) for point in payload.points]
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="An area with this name already exists for this event.") from None
+    db.refresh(area)
+    return area
+
+
 @router.delete("/{area_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_area(
     organization_id: UUID, event_id: UUID, area_id: UUID,
