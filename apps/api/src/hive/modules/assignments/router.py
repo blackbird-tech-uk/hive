@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from hive.db.session import get_db
 from hive.modules.assignments.schemas import (
-    AssignmentCreate,
     AssignmentAreaUpdate,
+    AssignmentCreate,
     AssignmentResponse,
 )
 from hive.modules.assignments.service import AssignmentService
