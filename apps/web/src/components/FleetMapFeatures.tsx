@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createMapArea, deleteMapArea, getMapAreas, updateMapArea, type MapArea } from '../lib/api/mapAreas'
 import { CircleMarker, Polygon, Popup, useMapEvents } from 'react-leaflet'
 import { DomEvent } from 'leaflet'
-import { useRef } from 'react'
 import { type LatLngTuple } from 'leaflet'
 
 function MapClickCapture({ onPoint }: { onPoint: (point: LatLngTuple) => void }) {
@@ -45,10 +44,10 @@ export function FleetMapFeatures({
   }, [eventId])
   const visible = features.filter((feature) => feature.event_id === eventId)
   const capture = (point: LatLngTuple) => {
-    if (mode === 'zone') setPoints((old) => [...old, point])
+    if (mode === 'zone' && !loading) setPoints((old) => old.length < 100 ? [...old, point] : old)
   }
   const save = async () => {
-    if (!eventId || !name.trim() || points.length < 3) return
+    if (!eventId || !name.trim() || points.length < 3 || points.length > 100 || loading) return
     setLoading(true)
     try {
       const payload = { name: name.trim(), points: points.map(([lat, lng]): [number, number] => [lat, lng]) }
@@ -80,14 +79,14 @@ export function FleetMapFeatures({
       {mode !== 'idle' && <div className="fleet-area-controls">
         <label htmlFor="fleet-area-name">Area name</label>
         <input id="fleet-area-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Registration Desk A" maxLength={100} />
-        <span>{editingId ? 'Existing points are loaded. Use Undo point or Clear points to redraw the boundary.' : 'Click at least three map points to outline the allocated area.'} {points.length} point(s) selected.</span>
-        <button type="button" className="secondary-button" disabled={points.length === 0} onClick={() => setPoints((old) => old.slice(0, -1))}>Undo point</button>
-        <button type="button" className="secondary-button" disabled={points.length === 0} onClick={() => setPoints([])}>Clear points</button>
-        <button type="button" className="secondary-button" onClick={save} disabled={loading || !name.trim() || points.length < 3}>{editingId ? "Save changes" : "Save area"}</button>
+        <span>{editingId ? 'Existing points are loaded. Use Undo point or Clear points to redraw the boundary.' : 'Click at least three map points to outline the allocated area.'} {points.length} of 100 points selected. On mobile, tap the map to add boundary points.</span>
+        <button type="button" className="secondary-button" disabled={points.length === 0 || loading} onClick={() => setPoints((old) => old.slice(0, -1))}>Undo point</button>
+        <button type="button" className="secondary-button" disabled={points.length === 0 || loading} onClick={() => setPoints([])}>Clear points</button>
+        <button type="button" className="secondary-button" onClick={save} disabled={loading || !name.trim() || points.length < 3 || points.length > 100}>{editingId ? "Save changes" : "Save area"}</button>
       </div>}
       {!fetching && eventId && visible.length === 0 && !error && <small>No saved areas for this event yet.</small>}
       {visible.length > 0 && <div className="fleet-area-list">{visible.map((feature) =>
-        <div key={feature.id}><span>▱ {feature.name}</span><button type="button" className="secondary-button" disabled={loading || saving || fetching} onClick={() => edit(feature)}>Edit</button><button type="button" aria-label={`Delete ${feature.name}`} onClick={async () => { if (!eventId) return; try { await deleteMapArea(eventId, feature.id); setFeatures((old) => old.filter((item) => item.id !== feature.id)); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete area') } }}>Remove</button></div>
+        <div key={feature.id}><span>▱ {feature.name}</span><button type="button" className="secondary-button" disabled={loading || saving || fetching} onClick={() => edit(feature)}>Edit</button><button type="button" aria-label={`Delete ${feature.name}`} disabled={loading || saving || fetching} onClick={async () => { if (!eventId || !window.confirm(`Remove ${feature.name}? This cannot be undone.`)) return; try { await deleteMapArea(eventId, feature.id); setFeatures((old) => old.filter((item) => item.id !== feature.id)); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete area') } }}>Remove</button></div>
       )}</div>}
       {deviceName && !assignedAreaId && visible.length > 0 && <div className="fleet-area-controls">
         <label htmlFor="fleet-area-assignment">Assign {deviceName} to a map area</label>
@@ -97,7 +96,7 @@ export function FleetMapFeatures({
       <small>Area boundaries are saved to HIVE and shared with authorised users of this organisation.</small>
     </div>
     {mode !== 'idle' && <MapClickCapture onPoint={capture} />}
-    {visible.map((feature) => <Polygon key={feature.id} positions={feature.points} pathOptions={{ color: '#e6b43c', fillOpacity: 0.17 }}><Popup><strong>{feature.name}</strong><br/>Allocated area</Popup></Polygon>)}
+    {visible.filter((feature) => feature.id !== editingId).map((feature) => <Polygon key={feature.id} positions={feature.points} pathOptions={{ color: '#e6b43c', fillOpacity: 0.17 }}><Popup><strong>{feature.name}</strong><br/>Allocated area</Popup></Polygon>)}
     {mode === 'zone' && points.map((point, index) => <CircleMarker key={index} center={point} radius={5} pathOptions={{ color: '#e6b43c' }} />)}
     {mode === 'zone' && points.length >= 3 && <Polygon positions={points} pathOptions={{ color: '#e6b43c', dashArray: '5,5' }} />}
   </>
