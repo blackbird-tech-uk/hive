@@ -255,28 +255,6 @@ loadDeviceWithToken(
     serverUrl = storedServerUrl,
 )
 
-                if (storedToken.isNullOrBlank()) {
-                    throw IllegalStateException(
-                        "The device token could not be read after saving.",
-                    )
-                }
-
-                if (storedToken != deviceToken) {
-                    throw IllegalStateException(
-                        "The stored device token does not match " +
-                                "the enrolment response.",
-                    )
-                }
-
-                Log.d(
-                    LOG_TAG,
-                    "Device token saved and verified",
-                )
-
-              loadDeviceWithToken(
-    deviceToken = storedToken,
-    serverUrl = storedServerUrl,
-)
             } catch (error: Exception) {
                 Log.e(
                     LOG_TAG,
