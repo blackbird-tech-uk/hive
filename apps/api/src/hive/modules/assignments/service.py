@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -90,4 +92,37 @@ class AssignmentService:
         self.db.commit()
         self.db.refresh(assignment)
 
+        return assignment
+
+    def move_area(self, assignment_id: uuid.UUID, area_id: uuid.UUID, actor: User) -> Assignment:
+        assignment = self.db.get(Assignment, assignment_id)
+        if assignment is None:
+            raise ValueError("Assignment not found.")
+        device = self.db.get(Device, assignment.device_id, with_for_update=True)
+        if device is None:
+            raise ValueError("Scanner not found.")
+        try:
+            OrganizationService(self.db).get_organization_for_user(
+                organization_id=device.organization_id, actor=actor,
+            )
+        except (OrganizationAccessDeniedError, OrganizationNotFoundError) as exc:
+            raise PermissionError("Organisation access denied.") from exc
+        if actor.role == UserRole.READ_ONLY:
+            raise PermissionError("Read-only users cannot move scanners.")
+        if assignment.status != AssignmentStatus.ASSIGNED:
+            raise ValueError("Only active assignments can be moved.")
+        event = self.event_repository.get_by_id(assignment.event_id)
+        if event is None or event.organization_id != device.organization_id:
+            raise ValueError("Event not found for this organisation.")
+        area = self.db.scalar(select(MapArea).where(
+            MapArea.id == area_id,
+            MapArea.organization_id == device.organization_id,
+            MapArea.event_id == assignment.event_id,
+        ))
+        if area is None:
+            raise ValueError("Allocated area not found for this organisation and event.")
+        assignment.map_area_id = area.id
+        assignment.assigned_location = area.name
+        self.db.commit()
+        self.db.refresh(assignment)
         return assignment
