@@ -8,7 +8,7 @@ import pytest
 
 from hive.modules.assignments.schemas import AssignmentCreate
 from hive.modules.assignments.service import AssignmentService
-from hive.modules.devices.models import DeviceStatus
+from hive.modules.devices.models import Device, DeviceStatus
 from hive.modules.users.models import UserRole
 
 
@@ -20,6 +20,7 @@ def setup_service(monkeypatch):
         id=device_id, organization_id=org_id, status=DeviceStatus.AVAILABLE,
     )
     db.get.return_value = device
+    db.scalar.return_value = None
     service.event_repository.get_by_id = MagicMock(
         return_value=SimpleNamespace(organization_id=org_id),
     )
@@ -50,10 +51,10 @@ def test_accepts_matching_saved_area(monkeypatch):
     db, service, actor, payload, org_id, event_id, area_id = setup_service(
         monkeypatch,
     )
-    db.scalar.return_value = SimpleNamespace(
+    db.scalar.side_effect = [None, SimpleNamespace(
         id=area_id, name="Registration A",
         organization_id=org_id, event_id=event_id,
-    )
+    )]
     service.create(payload, actor)
 
     saved = db.add.call_args.args[0]
@@ -82,3 +83,19 @@ def test_rejects_event_owned_by_another_organisation(monkeypatch):
         service.create(payload, actor)
 
     db.add.assert_not_called()
+
+
+def test_rejects_duplicate_active_scanner_assignment(monkeypatch):
+    db, service, actor, payload, *_ = setup_service(monkeypatch)
+    db.scalar.return_value = uuid4()
+
+    with pytest.raises(ValueError, match="already has an active assignment"):
+        service.create(payload, actor)
+
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    db.get.assert_called_once_with(
+        Device,
+        payload.device_id,
+        with_for_update=True,
+    )
