@@ -52,9 +52,12 @@ class HiveViewModel(
             "Loading local enrolment",
         )
 
+        // A refresh is not an unenrolment. Keep the running command
+        // service active until credentials are explicitly removed.
         _uiState.value =
-            HiveUiState(
+            _uiState.value.copy(
                 isLoading = true,
+                error = null,
             )
 
         try {
