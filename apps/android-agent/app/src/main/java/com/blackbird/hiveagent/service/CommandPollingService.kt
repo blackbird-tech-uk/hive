@@ -51,15 +51,11 @@ class CommandPollingService : Service() {
         super.onCreate()
 
         tokenStorage = TokenStorage(applicationContext)
-        apiClient = HiveApiClient()
         deviceInfoProvider =
             DeviceInfoProvider(applicationContext)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         telemetryQueue = TelemetryQueue(applicationContext)
-        commandProcessor = CommandProcessor(
-            context = applicationContext,
-            apiClient = apiClient,
-        )
+
 
         createNotificationChannel()
 
@@ -111,6 +107,12 @@ class CommandPollingService : Service() {
                 stopSelf()
                 return
             }
+
+        apiClient = HiveApiClient(tokenStorage.getServerUrl())
+        commandProcessor = CommandProcessor(
+            context = applicationContext,
+            apiClient = apiClient,
+        )
 
         flushQueuedLocations(deviceToken)
         uploadLatestLocationIfDue(deviceToken)
