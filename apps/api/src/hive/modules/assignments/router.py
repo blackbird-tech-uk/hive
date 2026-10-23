@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from hive.db.session import get_db
 from hive.modules.assignments.schemas import (
     AssignmentCreate,
+    AssignmentAreaUpdate,
     AssignmentResponse,
 )
 from hive.modules.assignments.service import AssignmentService
@@ -48,3 +51,18 @@ def create_assignment(
             detail=str(exc),
         ) from exc
 
+
+
+@router.patch("/{assignment_id}/area", response_model=AssignmentResponse)
+def move_assignment_area(
+    assignment_id: uuid.UUID,
+    payload: AssignmentAreaUpdate,
+    actor: CurrentUser,
+    db: Session = Depends(get_db),
+) -> AssignmentResponse:
+    try:
+        return AssignmentService(db).move_area(assignment_id, payload.map_area_id, actor)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
