@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from hive.modules.assignments.models import AssignmentStatus
 from hive.modules.assignments.schemas import AssignmentCreate
 from hive.modules.assignments.service import AssignmentService
 from hive.modules.devices.models import Device, DeviceStatus
@@ -99,3 +100,59 @@ def test_rejects_duplicate_active_scanner_assignment(monkeypatch):
         payload.device_id,
         with_for_update=True,
     )
+
+
+def test_move_area_preserves_assignment_and_event(monkeypatch):
+    db, service, actor, payload, org_id, event_id, area_id = setup_service(monkeypatch)
+    assignment = SimpleNamespace(
+        id=uuid4(), device_id=payload.device_id, event_id=event_id,
+        status=AssignmentStatus.ASSIGNED, map_area_id=None,
+        assigned_location="Old desk",
+    )
+    db.get.side_effect = [assignment, SimpleNamespace(
+        id=payload.device_id, organization_id=org_id,
+    )]
+    db.scalar.return_value = SimpleNamespace(id=area_id, name="Desk B")
+
+    result = service.move_area(assignment.id, area_id, actor)
+
+    assert result is assignment
+    assert result.event_id == event_id
+    assert result.map_area_id == area_id
+    assert result.assigned_location == "Desk B"
+    db.add.assert_not_called()
+    db.commit.assert_called_once()
+
+
+def test_move_area_rejects_other_event(monkeypatch):
+    db, service, actor, payload, org_id, event_id, area_id = setup_service(monkeypatch)
+    assignment = SimpleNamespace(
+        id=uuid4(), device_id=payload.device_id, event_id=event_id,
+        status=AssignmentStatus.ASSIGNED,
+    )
+    db.get.side_effect = [assignment, SimpleNamespace(
+        id=payload.device_id, organization_id=org_id,
+    )]
+    db.scalar.return_value = None
+
+    with pytest.raises(ValueError, match="not found for this organisation and event"):
+        service.move_area(assignment.id, area_id, actor)
+
+    db.commit.assert_not_called()
+
+
+def test_read_only_user_cannot_move_scanner(monkeypatch):
+    db, service, actor, payload, org_id, event_id, area_id = setup_service(monkeypatch)
+    actor.role = UserRole.READ_ONLY
+    assignment = SimpleNamespace(
+        id=uuid4(), device_id=payload.device_id, event_id=event_id,
+        status=AssignmentStatus.ASSIGNED,
+    )
+    db.get.side_effect = [assignment, SimpleNamespace(
+        id=payload.device_id, organization_id=org_id,
+    )]
+
+    with pytest.raises(PermissionError, match="Read-only"):
+        service.move_area(assignment.id, area_id, actor)
+
+    db.commit.assert_not_called()
