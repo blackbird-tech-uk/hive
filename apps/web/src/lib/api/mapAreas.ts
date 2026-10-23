@@ -27,6 +27,10 @@ export function createMapArea(eventId: string, payload: MapAreaPayload): Promise
   return api.post<MapArea>(base(eventId), payload)
 }
 
+export function updateMapArea(eventId: string, areaId: string, payload: MapAreaPayload): Promise<MapArea> {
+  return api.put<MapArea>(`${base(eventId)}/${encodeURIComponent(areaId)}`, payload)
+}
+
 export function deleteMapArea(eventId: string, areaId: string): Promise<void> {
   return api.delete<void>(`${base(eventId)}/${encodeURIComponent(areaId)}`)
 }
