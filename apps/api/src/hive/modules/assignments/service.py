@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from hive.modules.assignments.models import Assignment
+from hive.modules.assignments.models import Assignment, AssignmentStatus
 from hive.modules.assignments.repository import AssignmentRepository
 from hive.modules.assignments.schemas import AssignmentCreate
 from hive.modules.devices.models import Device, DeviceStatus
@@ -36,7 +36,7 @@ class AssignmentService:
         ).all())
 
     def create(self, payload: AssignmentCreate, actor: User) -> Assignment:
-        device = self.db.get(Device, payload.device_id)
+        device = self.db.get(Device, payload.device_id, with_for_update=True)
 
         if device is None:
             raise ValueError("Device not found.")
@@ -54,6 +54,13 @@ class AssignmentService:
 
         if event is None or event.organization_id != device.organization_id:
             raise ValueError("Event not found for this organisation.")
+
+        existing = self.db.scalar(select(Assignment.id).where(
+            Assignment.device_id == payload.device_id,
+            Assignment.status == AssignmentStatus.ASSIGNED,
+        ))
+        if existing is not None:
+            raise ValueError("Scanner already has an active assignment.")
 
         if device.status != DeviceStatus.AVAILABLE:
             raise ValueError("Device is not available.")
