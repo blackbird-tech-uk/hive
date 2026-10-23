@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { createMapArea, deleteMapArea, getMapAreas, updateMapArea, type MapArea } from '../lib/api/mapAreas'
 import { CircleMarker, Polygon, Popup, useMapEvents } from 'react-leaflet'
+import { DomEvent } from 'leaflet'
+import { useRef } from 'react'
 import { type LatLngTuple } from 'leaflet'
 
 function MapClickCapture({ onPoint }: { onPoint: (point: LatLngTuple) => void }) {
@@ -16,6 +18,7 @@ export function FleetMapFeatures({
   assignedAreaId?: string | null
   deviceName?: string
 }) {
+  const editorRef = useRef<HTMLDivElement>(null)
   const [features, setFeatures] = useState<MapArea[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -57,8 +60,15 @@ export function FleetMapFeatures({
   const cancel = () => { setMode('idle'); setEditingId(null); setPoints([]); setName('') }
   const edit = (area: MapArea) => { setEditingId(area.id); setName(area.name); setPoints(area.points.map(([lat, lng]) => [lat, lng])); setMode('zone'); setError('') }
 
+  useEffect(() => {
+    const element = editorRef.current
+    if (!element) return
+    DomEvent.disableClickPropagation(element)
+    DomEvent.disableScrollPropagation(element)
+  }, [])
+
   return <>
-    <div className="fleet-area-editor">
+    <div ref={editorRef} className="fleet-area-editor">
       <strong>Allocated areas</strong>
       {error && <span role="alert">{error}</span>}
       {fetching && <span role="status">Loading saved areas…</span>}
@@ -77,7 +87,7 @@ export function FleetMapFeatures({
       </div>}
       {!fetching && eventId && visible.length === 0 && !error && <small>No saved areas for this event yet.</small>}
       {visible.length > 0 && <div className="fleet-area-list">{visible.map((feature) =>
-        <div key={feature.id}><span>▱ {feature.name}</span><button type="button" className="secondary-button" disabled={loading || saving} onClick={() => edit(feature)}>Edit</button><button type="button" aria-label={`Delete ${feature.name}`} onClick={async () => { if (!eventId) return; try { await deleteMapArea(eventId, feature.id); setFeatures((old) => old.filter((item) => item.id !== feature.id)); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete area') } }}>Remove</button></div>
+        <div key={feature.id}><span>▱ {feature.name}</span><button type="button" className="secondary-button" disabled={loading || saving || fetching} onClick={() => edit(feature)}>Edit</button><button type="button" aria-label={`Delete ${feature.name}`} onClick={async () => { if (!eventId) return; try { await deleteMapArea(eventId, feature.id); setFeatures((old) => old.filter((item) => item.id !== feature.id)); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete area') } }}>Remove</button></div>
       )}</div>}
       {deviceName && !assignedAreaId && visible.length > 0 && <div className="fleet-area-controls">
         <label htmlFor="fleet-area-assignment">Assign {deviceName} to a map area</label>
