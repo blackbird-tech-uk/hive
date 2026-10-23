@@ -7,6 +7,7 @@ import { TopBar } from '../components/layout/TopBar'
 import { FleetMapFeatures } from '../components/FleetMapFeatures'
 import type { MapArea } from '../lib/api/mapAreas'
 import { createAssignment, getAssignments, getDevices, getEvents } from '../lib/api'
+import { moveAssignmentArea } from '../lib/api/assignments'
 import { getLatestDeviceLocations } from '../lib/api/locations'
 import type { Assignment, Device, DeviceLocation, Event } from '../lib/api/types'
 import { isDeviceOnline } from '../lib/fleet'
@@ -93,8 +94,12 @@ export function FleetMapPage() {
     try {
       if (mapArea && mapArea.event_id !== event.id) throw new Error('Area belongs to a different event.')
       if (mapArea && mapArea.organization_id !== device.organization_id) throw new Error('Area belongs to a different organisation.')
-      const created = await createAssignment({ device_id: device.id, event_id: event.id, map_area_id: mapArea?.id, assigned_location: area })
-      setAssignments((current) => [created, ...current.filter((item) => item.device_id !== device.id || item.status !== 'assigned')])
+      const existing = assignments.find((item) => item.device_id === device.id && item.status === 'assigned')
+      if (existing && (!mapArea || existing.event_id !== event.id)) throw new Error('Scanner is already assigned to an event. Return it before assigning to another event.')
+      const updated = existing && mapArea
+        ? await moveAssignmentArea(existing.id, mapArea.id)
+        : await createAssignment({ device_id: device.id, event_id: event.id, map_area_id: mapArea?.id, assigned_location: area })
+      setAssignments((current) => [updated, ...current.filter((item) => item.id !== updated.id)])
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to assign scanner area.')
@@ -102,12 +107,12 @@ export function FleetMapPage() {
     } finally {
       setAssigningDeviceId(null)
     }
-  }, [events, selectedEventId])
+  }, [assignments, events, selectedEventId])
 
   const activeEvents = events.filter((event) => event.status?.toLowerCase() === 'active' || event.status?.toLowerCase() === 'planned')
   const activeEventId = activeEvents.some((event) => event.id === selectedEventId) ? selectedEventId : activeEvents[0]?.id || null
   const selectedDevice = devices.find((device) => device.id === selectedDeviceId)
-  const selectedAssignment = assignments.find((item) => item.device_id === selectedDeviceId && item.event_id === activeEventId && item.status === 'assigned')
+  const selectedAssignment = assignments.find((item) => item.device_id === selectedDeviceId && item.status === 'assigned')
 
   return <>
     <TopBar isLoading={loading} onRefresh={() => void load()} />
