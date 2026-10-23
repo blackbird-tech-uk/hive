@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createMapArea, deleteMapArea, getMapAreas, updateMapArea, type MapArea } from '../lib/api/mapAreas'
 import { CircleMarker, Polygon, Popup, useMapEvents } from 'react-leaflet'
-import { DomEvent } from 'leaflet'
-import { type LatLngTuple } from 'leaflet'
+import { DomEvent, type LatLngTuple } from 'leaflet'
 
 function MapClickCapture({ onPoint }: { onPoint: (point: LatLngTuple) => void }) {
   useMapEvents({ click: (event) => onPoint([event.latlng.lat, event.latlng.lng]) })
@@ -28,6 +27,7 @@ export function FleetMapFeatures({
   const [name, setName] = useState('')
   const [selected, setSelected] = useState('')
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -86,7 +86,7 @@ export function FleetMapFeatures({
       </div>}
       {!fetching && eventId && visible.length === 0 && !error && <small>No saved areas for this event yet.</small>}
       {visible.length > 0 && <div className="fleet-area-list">{visible.map((feature) =>
-        <div key={feature.id}><span>▱ {feature.name}</span><button type="button" className="secondary-button" disabled={loading || saving || fetching} onClick={() => edit(feature)}>Edit</button><button type="button" aria-label={`Delete ${feature.name}`} disabled={loading || saving || fetching} onClick={async () => { if (!eventId || !window.confirm(`Remove ${feature.name}? This cannot be undone.`)) return; try { await deleteMapArea(eventId, feature.id); setFeatures((old) => old.filter((item) => item.id !== feature.id)); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete area') } }}>Remove</button></div>
+        <div key={feature.id}><span>▱ {feature.name}</span><button type="button" className="secondary-button" disabled={loading || saving || fetching || Boolean(deletingId)} onClick={() => edit(feature)}>Edit</button><button type="button" aria-label={`Delete ${feature.name}`} disabled={loading || saving || fetching || Boolean(deletingId)} onClick={async () => { if (!eventId || !window.confirm(`Remove ${feature.name}? This cannot be undone.`)) return; setDeletingId(feature.id); try { await deleteMapArea(eventId, feature.id); setFeatures((old) => old.filter((item) => item.id !== feature.id)); if (selected === feature.id) setSelected(''); if (editingId === feature.id) cancel(); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete area') } finally { setDeletingId(null) } }}>{deletingId === feature.id ? 'Removing…' : 'Remove'}</button></div>
       )}</div>}
       {deviceName && !assignedAreaId && visible.length > 0 && <div className="fleet-area-controls">
         <label htmlFor="fleet-area-assignment">Assign {deviceName} to a map area</label>
@@ -96,8 +96,8 @@ export function FleetMapFeatures({
       <small>Area boundaries are saved to HIVE and shared with authorised users of this organisation.</small>
     </div>
     {mode !== 'idle' && <MapClickCapture onPoint={capture} />}
-    {visible.filter((feature) => feature.id !== editingId).map((feature) => <Polygon key={feature.id} positions={feature.points} pathOptions={{ color: '#e6b43c', fillOpacity: 0.17 }}><Popup><strong>{feature.name}</strong><br/>Allocated area</Popup></Polygon>)}
-    {mode === 'zone' && points.map((point, index) => <CircleMarker key={index} center={point} radius={5} pathOptions={{ color: '#e6b43c' }} />)}
-    {mode === 'zone' && points.length >= 3 && <Polygon positions={points} pathOptions={{ color: '#e6b43c', dashArray: '5,5' }} />}
+    {visible.filter((feature) => feature.id !== editingId).map((feature) => <Polygon key={feature.id} interactive={mode === 'idle'} positions={feature.points} pathOptions={{ color: '#e6b43c', fillOpacity: 0.17 }}><Popup><strong>{feature.name}</strong><br/>Allocated area</Popup></Polygon>)}
+    {mode === 'zone' && points.map((point, index) => <CircleMarker key={index} interactive={false} center={point} radius={5} pathOptions={{ color: '#e6b43c' }} />)}
+    {mode === 'zone' && points.length >= 3 && <Polygon interactive={false} positions={points} pathOptions={{ color: '#e6b43c', dashArray: '5,5' }} />}
   </>
 }
