@@ -24,6 +24,10 @@ class AssignmentCreate(BaseModel):
     notes: str | None = None
 
 
+class AssignmentAreaUpdate(BaseModel):
+    map_area_id: uuid.UUID
+
+
 class AssignmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
