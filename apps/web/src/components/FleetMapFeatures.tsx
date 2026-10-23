@@ -9,11 +9,12 @@ function MapClickCapture({ onPoint }: { onPoint: (point: LatLngTuple) => void })
 }
 
 export function FleetMapFeatures({
-  eventId, onAssign, assignedAreaId, deviceName,
+  eventId, onAssign, assignedAreaId, assignedEventId, deviceName,
 }: {
   eventId: string | null
   onAssign: (area: MapArea) => Promise<void>
   assignedAreaId?: string | null
+  assignedEventId?: string | null
   deviceName?: string
 }) {
   const editorRef = useRef<HTMLDivElement>(null)
@@ -88,11 +89,12 @@ export function FleetMapFeatures({
       {visible.length > 0 && <div className="fleet-area-list">{visible.map((feature) =>
         <div key={feature.id}><span>▱ {feature.name}</span><button type="button" className="secondary-button" disabled={loading || saving || fetching || Boolean(deletingId)} onClick={() => edit(feature)}>Edit</button><button type="button" aria-label={`Delete ${feature.name}`} disabled={loading || saving || fetching || Boolean(deletingId)} onClick={async () => { if (!eventId || !window.confirm(`Remove ${feature.name}? This cannot be undone.`)) return; setDeletingId(feature.id); try { await deleteMapArea(eventId, feature.id); setFeatures((old) => old.filter((item) => item.id !== feature.id)); if (selected === feature.id) setSelected(''); if (editingId === feature.id) cancel(); setError('') } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete area') } finally { setDeletingId(null) } }}>{deletingId === feature.id ? 'Removing…' : 'Remove'}</button></div>
       )}</div>}
-      {deviceName && !assignedAreaId && visible.length > 0 && <div className="fleet-area-controls">
-        <label htmlFor="fleet-area-assignment">Assign {deviceName} to a map area</label>
-        <select id="fleet-area-assignment" value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">Choose area</option>{visible.map((feature) => <option key={feature.id} value={feature.id}>{feature.name}</option>)}</select>
-        <button type="button" className="secondary-button" disabled={!selected || saving} onClick={async () => { setSaving(true); try { const area = visible.find((feature) => feature.id === selected); if (area) { await onAssign(area); setSelected(''); setError('') } } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not assign scanner') } finally { setSaving(false) } }}>{saving ? 'Assigning…' : 'Assign scanner'}</button>
+      {deviceName && visible.length > 0 && (!assignedEventId || assignedEventId === eventId) && <div className="fleet-area-controls">
+        <label htmlFor="fleet-area-assignment">{assignedEventId ? `Move ${deviceName} to another area` : `Assign ${deviceName} to a map area`}</label>
+        <select id="fleet-area-assignment" value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">Choose area</option>{visible.filter((feature) => feature.id !== assignedAreaId).map((feature) => <option key={feature.id} value={feature.id}>{feature.name}</option>)}</select>
+        <button type="button" className="secondary-button" disabled={!selected || saving} onClick={async () => { setSaving(true); try { const area = visible.find((feature) => feature.id === selected); if (area) { await onAssign(area); setSelected(''); setError('') } } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not assign scanner') } finally { setSaving(false) } }}>{saving ? 'Saving…' : assignedEventId ? 'Move scanner' : 'Assign scanner'}</button>
       </div>}
+      {deviceName && assignedEventId && assignedEventId !== eventId && <small>This scanner is assigned to another event. Return it before assigning it here.</small>}
       <small>Area boundaries are saved to HIVE and shared with authorised users of this organisation.</small>
     </div>
     {mode !== 'idle' && <MapClickCapture onPoint={capture} />}
