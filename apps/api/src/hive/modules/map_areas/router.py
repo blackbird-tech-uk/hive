@@ -105,7 +105,10 @@ def update_area(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="An area with this name already exists for this event.") from None
+        raise HTTPException(
+            status_code=409,
+            detail="An area with this name already exists for this event.",
+        ) from None
     db.refresh(area)
     return area
 
