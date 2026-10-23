@@ -103,15 +103,7 @@ fun HiveAgentScreen(
 
             hiveViewModel.loadDevice()
 
-            if (uiState.isEnrolled) {
-                startForegroundService(
-                    context,
-                    Intent(
-                        context,
-                        CommandPollingService::class.java,
-                    ),
-                )
-            }
+
         }
 
     val locationPermissionLauncher =
