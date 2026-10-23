@@ -3,25 +3,12 @@ package com.blackbird.hiveagent.data.network
 import com.blackbird.hiveagent.BuildConfig
 import com.blackbird.hiveagent.data.local.TokenStorage
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
-    private val logging =
-        HttpLoggingInterceptor().apply {
-            level =
-                if (BuildConfig.DEBUG) {
-                    HttpLoggingInterceptor.Level.BODY
-                } else {
-                    HttpLoggingInterceptor.Level.NONE
-                }
-        }
-
-    private val client =
-        OkHttpClient.Builder()
-            .addInterceptor(logging)
-            .build()
+    // Never log enrolment credentials or bearer tokens, including in debug builds.
+    private val client = OkHttpClient.Builder().build()
 
     fun create(
         serverUrl: String,
