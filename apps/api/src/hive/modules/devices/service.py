@@ -339,27 +339,24 @@ class DeviceService:
         if device is None:
             raise DeviceNotFoundError(device_id)
 
+        # Generate the replacement before invalidating the existing token.
+        # If signing fails, the currently enrolled scanner stays authorised.
         device.device_token_version += 1
 
         try:
+            device_token, expires_in = create_access_token(
+                subject=str(device.id),
+                additional_claims={
+                    "type": "device",
+                    "organization_id": str(device.organization_id),
+                    "token_version": device.device_token_version,
+                },
+            )
             self.db.commit()
             self.db.refresh(device)
         except Exception:
             self.db.rollback()
             raise
-
-        device_token, expires_in = create_access_token(
-            subject=str(device.id),
-            additional_claims={
-                "type": "device",
-                "organization_id": str(
-                    device.organization_id
-                ),
-                "token_version": (
-                    device.device_token_version
-                ),
-            },
-        )
 
         return DeviceTokenResponse(
             device_id=device.id,
