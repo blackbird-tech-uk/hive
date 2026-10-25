@@ -345,16 +345,12 @@ class DeviceService:
 
         try:
             device_token, expires_in = create_access_token(
-            subject=str(device.id),
-            additional_claims={
-                "type": "device",
-                "organization_id": str(
-                    device.organization_id
-                ),
-                "token_version": (
-                    device.device_token_version
-                ),
-            },
+                subject=str(device.id),
+                additional_claims={
+                    "type": "device",
+                    "organization_id": str(device.organization_id),
+                    "token_version": device.device_token_version,
+                },
             )
             self.db.commit()
             self.db.refresh(device)
