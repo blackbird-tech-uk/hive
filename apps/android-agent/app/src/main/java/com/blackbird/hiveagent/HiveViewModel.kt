@@ -102,10 +102,11 @@ class HiveViewModel(
                 error,
             )
 
+            // Preserve the current enrolment state on a local read error.
+            // A failed DataStore read is not permission to forget a scanner.
             _uiState.value =
-                HiveUiState(
+                _uiState.value.copy(
                     isLoading = false,
-                    isEnrolled = false,
                     error = readableError(error),
                 )
         }
