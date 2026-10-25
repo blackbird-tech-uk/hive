@@ -25,9 +25,9 @@ jobs:
       - name: Report APK signing certificate fingerprint
         run: |
           APK="app/build/outputs/apk/debug/app-debug.apk"
-          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
-          if [ ! -x "$APKSIGNER" ]; then
-            echo "Android build-tools 35.0.0 apksigner unavailable"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name apksigner -type f | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER" ] || [ ! -x "$APKSIGNER" ]; then
+            echo "Android apksigner unavailable"
             exit 1
           fi
           "$APKSIGNER" verify --print-certs "$APK"
