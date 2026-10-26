@@ -103,15 +103,7 @@ fun HiveAgentScreen(
 
             hiveViewModel.loadDevice()
 
-            if (uiState.isEnrolled) {
-                startForegroundService(
-                    context,
-                    Intent(
-                        context,
-                        CommandPollingService::class.java,
-                    ),
-                )
-            }
+
         }
 
     val locationPermissionLauncher =
@@ -208,6 +200,27 @@ fun HiveAgentScreen(
 
                     deviceAdminLauncher.launch(intent)
                 },            )
+        }
+
+        uiState.hasStoredEnrolment -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("Scanner enrolment saved")
+                Text(
+                    uiState.error
+                        ?: "Hive could not validate this scanner. Check the connection.",
+                )
+                Button(onClick = hiveViewModel::loadDevice) {
+                    Text("Retry connection")
+                }
+                OutlinedButton(onClick = hiveViewModel::clearEnrolment) {
+                    Text("Remove enrolment")
+                }
+            }
         }
 
         else -> {

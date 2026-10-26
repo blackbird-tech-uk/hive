@@ -41,6 +41,13 @@ class Assignment(Base):
         index=True,
     )
 
+    map_area_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("map_areas.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+
     assigned_to_name: Mapped[str | None] = mapped_column(
         String(150),
         nullable=True,

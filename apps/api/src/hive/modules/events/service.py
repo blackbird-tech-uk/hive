@@ -26,6 +26,7 @@ class EventService:
 
     def create_event(self, payload: EventCreate) -> Event:
         event = Event(
+            organization_id=payload.organization_id,
             name=payload.name.strip(),
             venue=payload.venue.strip(),
             start_date=payload.start_date,
