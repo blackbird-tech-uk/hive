@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 
 import type { Device } from '../../lib/api'
+import './device-mobile.css'
 import { StatusBadge } from './StatusBadge'
 
 const ONLINE_THRESHOLD_MS = 20 * 60 * 1_000
@@ -69,6 +70,31 @@ export function DeviceTable({
 
   return (
     <div className="device-table-wrapper">
+      <div className="mobile-device-list" aria-label="Scanners">
+        {devices.map((device) => {
+          const online = isDeviceOnline(device)
+          const selected = selectedDeviceIds?.has(device.id) ?? false
+          return (
+            <article className="mobile-device-card" key={device.id}>
+              <div className="mobile-device-card-header">
+                {selectable && <input type="checkbox" aria-label={`Select ${device.hive_id}`} checked={selected} onChange={() => onToggleDevice?.(device.id)} />}
+                <div className="mobile-device-identity">
+                  <strong>{device.hive_id}</strong>
+                  <span>{device.asset_id || device.serial_number || 'No asset recorded'} · {device.model ?? 'Unknown model'}</span>
+                </div>
+                <span className={`connection-status ${online ? 'connection-status-online' : 'connection-status-offline'}`}>{online ? 'Online' : 'Offline'}</span>
+              </div>
+              <div className="mobile-device-metrics">
+                <div><small>Battery</small><strong>{device.battery_level === null ? 'Unknown' : `${device.battery_level}%`}{device.is_charging ? ' · Charging' : ''}</strong></div>
+                <div><small>Wi-Fi</small><strong>{device.wifi_ssid ?? 'Unknown'}</strong></div>
+                <div><small>Last seen</small><strong>{formatLastSeen(device.last_seen_at)}</strong></div>
+                <div><small>Condition</small><strong>{formatLabel(device.condition)}</strong></div>
+              </div>
+              <button type="button" className="mobile-device-open" onClick={() => onSelectDevice(device)}>View scanner details</button>
+            </article>
+          )
+        })}
+      </div>
       <table className="device-table">
         <thead>
           <tr>
