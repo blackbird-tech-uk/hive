@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from hive.core.config import settings
 from hive.db.base import Base
+from hive.modules.map_areas.models import MapArea
 from hive.modules.assignments.models import Assignment
 from hive.modules.device_locations.models import DeviceLocation
 from hive.modules.device_commands.models import DeviceCommand

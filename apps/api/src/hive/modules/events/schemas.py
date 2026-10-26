@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class EventCreate(BaseModel):
+    organization_id: uuid.UUID | None = None
     name: str = Field(min_length=1, max_length=150)
     venue: str = Field(min_length=1, max_length=150)
     start_date: date
@@ -43,6 +44,7 @@ class EventUpdate(BaseModel):
 
 
 class EventResponse(BaseModel):
+    organization_id: uuid.UUID | None
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
