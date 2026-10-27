@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from hive.core.security import create_access_token
 from hive.core.config import settings
+from hive.core.security import create_access_token
 from hive.modules.devices.models import Device
 from hive.modules.devices.repository import DeviceRepository
 from hive.modules.devices.schemas import (
