@@ -360,7 +360,7 @@ class DeviceService:
                     device.device_token_version
                 ),
             },
-        expires_in_minutes=settings.device_token_expire_minutes,
+            expires_in_minutes=settings.device_token_expire_minutes,
         )
 
         return DeviceTokenResponse(
