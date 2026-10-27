@@ -18,3 +18,25 @@
   .mobile-device-open { width: 100%; padding: 12px; border: 1px solid #b58d36; border-radius: 10px; background: rgba(181,141,54,.12); color: #f0ca71; font: inherit; font-weight: 600; cursor: pointer; }
   .mobile-device-open:focus-visible { outline: 2px solid #f0ca71; outline-offset: 3px; }
 }
+
+@media (max-width: 767px) {
+  .mobile-device-select-all {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid #38383e;
+    border-radius: 10px;
+    background: #171719;
+    color: #f0ca71;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mobile-device-select-all:focus-visible { outline: 2px solid #f0ca71; outline-offset: 2px; }
+  .mobile-device-card-header .connection-status { max-width: 88px; white-space: nowrap; }
+  .mobile-device-open { min-height: 44px; }
+}
+@media (max-width: 360px) {
+  .mobile-device-card { padding: 12px; }
+  .mobile-device-metrics { gap: 10px; }
+}
