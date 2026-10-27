@@ -236,6 +236,23 @@ export function AppShell({
       </aside>
 
       <main className="app-shell-main">
+        {organizations.length > 0 && (
+          <div className="app-mobile-organization">
+            <label htmlFor="mobile-active-organization">Organisation</label>
+            <select
+              id="mobile-active-organization"
+              value={activeOrganization?.id ?? ''}
+              onChange={(event) => {
+                const organization = organizations.find((item) => item.id === event.target.value)
+                if (organization) setActiveOrganization(organization)
+              }}
+            >
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>{organization.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {children}
       </main>
     </div>
