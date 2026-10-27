@@ -9,8 +9,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from hive.core.security import create_access_token
 from hive.core.config import settings
+from hive.core.security import create_access_token
 from hive.modules.devices.models import (
     Device,
     DeviceCondition,
