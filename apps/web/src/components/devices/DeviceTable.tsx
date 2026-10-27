@@ -71,6 +71,16 @@ export function DeviceTable({
   return (
     <div className="device-table-wrapper">
       <div className="mobile-device-list" aria-label="Scanners">
+        {selectable && devices.length > 0 && (
+          <button
+            type="button"
+            className="mobile-device-select-all"
+            aria-pressed={allSelected}
+            onClick={() => onToggleAll?.()}
+          >
+            {allSelected ? 'Deselect all visible scanners' : `Select all ${devices.length} visible scanners`}
+          </button>
+        )}
         {devices.map((device) => {
           const online = isDeviceOnline(device)
           const selected = selectedDeviceIds?.has(device.id) ?? false
@@ -85,6 +95,8 @@ export function DeviceTable({
                 <span className={`connection-status ${online ? 'connection-status-online' : 'connection-status-offline'}`}>{online ? 'Online' : 'Offline'}</span>
               </div>
               <div className="mobile-device-metrics">
+                <div><small>IP address</small><strong>{device.ip_address ?? 'Not reported'}</strong></div>
+                <div><small>Status</small><strong>{formatLabel(device.status)}</strong></div>
                 <div><small>Battery</small><strong>{device.battery_level === null ? 'Unknown' : `${device.battery_level}%`}{device.is_charging ? ' · Charging' : ''}</strong></div>
                 <div><small>Wi-Fi</small><strong>{device.wifi_ssid ?? 'Unknown'}</strong></div>
                 <div><small>Last seen</small><strong>{formatLastSeen(device.last_seen_at)}</strong></div>
