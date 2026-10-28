@@ -23,9 +23,16 @@ def verify_password(
 def create_access_token(
     subject: str,
     additional_claims: dict[str, Any] | None = None,
+    *,
+    expires_in_minutes: int | None = None,
 ) -> tuple[str, int]:
     """Create a signed JWT access token."""
-    expires_in = settings.jwt_access_token_expire_minutes * 60
+    lifetime_minutes = (
+        expires_in_minutes
+        if expires_in_minutes is not None
+        else settings.jwt_access_token_expire_minutes
+    )
+    expires_in = lifetime_minutes * 60
 
     expires_at = datetime.now(timezone.utc) + timedelta(
         seconds=expires_in

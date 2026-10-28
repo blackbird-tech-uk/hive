@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from hive.core.config import settings
 from hive.core.security import create_access_token
 from hive.modules.devices.models import (
     Device,
@@ -276,6 +277,7 @@ class EnrollmentService:
                         device.device_token_version
                     ),
                 },
+                expires_in_minutes=settings.device_token_expire_minutes,
             )
 
             self.db.commit()

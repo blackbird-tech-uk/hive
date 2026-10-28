@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = DEVELOPMENT_JWT_SECRET
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 480
+    device_token_expire_minutes: int = 43200  # 30 days; refresh flow required before expiry
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
