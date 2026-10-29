@@ -22,11 +22,6 @@ class HeartbeatWorker(
     private val tokenStorage = TokenStorage(appContext)
     private val preferences = AgentPreferences(appContext)
     private val deviceInfoProvider = DeviceInfoProvider(appContext)
-    private val apiClient by lazy { HiveApiClient(baseUrl = kotlinx.coroutines.runBlocking { tokenStorage.getServerUrl() }.trimEnd('/')) }
-   private val commandProcessor = CommandProcessor(
-    context = appContext,
-    apiClient = apiClient,
-)
 
     override suspend fun doWork(): Result {
         Log.d(
@@ -58,6 +53,8 @@ class HeartbeatWorker(
         )
 
         return try {
+            val apiClient = HiveApiClient(baseUrl = tokenStorage.getServerUrl().trimEnd('/'))
+            val commandProcessor = CommandProcessor(context = applicationContext, apiClient = apiClient)
             if (shouldRenew(deviceToken)) {
                 val renewed = apiClient.renewDeviceToken(deviceToken)
                 tokenStorage.saveDeviceToken(renewed)
