@@ -1,19 +1,17 @@
 from typing import Annotated
-
-import jwt
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-from hive.core.security import create_access_token, decode_access_token
-from hive.core.config import settings
-from hive.modules.devices.repository import DeviceRepository
-from hive.modules.devices.schemas import DeviceTokenResponse
 from uuid import UUID
 
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from hive.core.config import settings
+from hive.core.security import create_access_token, decode_access_token
 from hive.db.session import get_db
 from hive.modules.auth.dependencies import CurrentUser
+from hive.modules.devices.repository import DeviceRepository
+from hive.modules.devices.schemas import DeviceTokenResponse
 from hive.modules.enrollment.exceptions import (
     EnrolledDeviceAlreadyExistsError,
     EnrollmentPermissionDeniedError,
@@ -180,7 +178,10 @@ def redeem_enrollment_token(
 )
 def renew_device_token(
     db: DatabaseSession,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(HTTPBearer(auto_error=False))],
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(HTTPBearer(auto_error=False)),
+    ],
 ) -> DeviceTokenResponse:
     """Renew a valid device JWT without changing the device's revocation version.
 
