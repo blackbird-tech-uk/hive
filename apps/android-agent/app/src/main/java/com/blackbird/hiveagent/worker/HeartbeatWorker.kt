@@ -11,6 +11,8 @@ import com.blackbird.hiveagent.data.local.TokenStorage
 import com.blackbird.hiveagent.device.DeviceInfoProvider
 import com.blackbird.hiveagent.storage.AgentPreferences
 import kotlinx.coroutines.flow.first
+import android.util.Base64
+import org.json.JSONObject
 
 class HeartbeatWorker(
     appContext: Context,
@@ -20,11 +22,6 @@ class HeartbeatWorker(
     private val tokenStorage = TokenStorage(appContext)
     private val preferences = AgentPreferences(appContext)
     private val deviceInfoProvider = DeviceInfoProvider(appContext)
-    private val apiClient = HiveApiClient()
-   private val commandProcessor = CommandProcessor(
-    context = appContext,
-    apiClient = apiClient,
-)
 
     override suspend fun doWork(): Result {
         Log.d(
@@ -32,7 +29,7 @@ class HeartbeatWorker(
             "HeartbeatWorker started",
         )
 
-        val deviceToken = tokenStorage.deviceToken
+        var deviceToken = tokenStorage.deviceToken
             .first()
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
@@ -56,6 +53,14 @@ class HeartbeatWorker(
         )
 
         return try {
+            val apiClient = HiveApiClient(baseUrl = tokenStorage.getServerUrl().trimEnd('/'))
+            val commandProcessor = CommandProcessor(context = applicationContext, apiClient = apiClient)
+            if (shouldRenew(deviceToken)) {
+                val renewed = apiClient.renewDeviceToken(deviceToken)
+                tokenStorage.saveDeviceToken(renewed)
+                deviceToken = renewed
+                Log.d(LOG_TAG, "Device credentials renewed before expiry")
+            }
             Log.d(
                 LOG_TAG,
                 "Creating heartbeat payload",
@@ -196,6 +201,17 @@ class HeartbeatWorker(
             )
 
             Result.retry()
+        }
+    }
+
+    private fun shouldRenew(token: String): Boolean {
+        return try {
+            val payload = token.split('.')[1]
+            val decoded = String(Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING))
+            val expiresAt = JSONObject(decoded).getLong("exp")
+            expiresAt - (System.currentTimeMillis() / 1000L) < 7L * 24L * 60L * 60L
+        } catch (_: Exception) {
+            true // Let the server validate an unparseable token; never trust local JWT data.
         }
     }
 
