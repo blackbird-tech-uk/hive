@@ -254,28 +254,6 @@ loadDeviceWithToken(
     serverUrl = storedServerUrl,
 )
 
-                if (storedToken.isNullOrBlank()) {
-                    throw IllegalStateException(
-                        "The device token could not be read after saving.",
-                    )
-                }
-
-                if (storedToken != deviceToken) {
-                    throw IllegalStateException(
-                        "The stored device token does not match " +
-                                "the enrolment response.",
-                    )
-                }
-
-                Log.d(
-                    LOG_TAG,
-                    "Device token saved and verified",
-                )
-
-              loadDeviceWithToken(
-    deviceToken = storedToken,
-    serverUrl = storedServerUrl,
-)
             } catch (error: Exception) {
                 Log.e(
                     LOG_TAG,
@@ -359,40 +337,20 @@ loadDeviceWithToken(
                 "Heartbeat scheduled after device authentication",
             )
         } catch (error: Exception) {
-            if (
-                error is HttpException &&
-                error.code() == 401
-            ) {
-                Log.e(
-                    LOG_TAG,
-                    "Hive rejected the stored device token with HTTP 401",
-                    error,
-                )
-
-                HeartbeatScheduler.cancel(
-                    applicationContext,
-                )
-
-                tokenStorage.clearDeviceToken()
-
-                Log.e(
-                    LOG_TAG,
-                    "Invalid device token removed from local storage",
-                )
-            } else {
-                Log.e(
-                    LOG_TAG,
-                    "Could not load device from Hive",
-                    error,
-                )
-            }
-
-            _uiState.value =
-                HiveUiState(
-                    isLoading = false,
-                    isEnrolled = false,
-                    error = readableError(error),
-                )
+            // Never delete persisted enrolment on a transient or authentication error.
+            // An expired JWT can be recovered once a supported recovery flow exists;
+            // revocation requires an explicit administrator decision.
+            Log.w(LOG_TAG, "Unable to verify device; preserving local enrolment", error)
+            HeartbeatScheduler.schedule(applicationContext)
+            _uiState.value = HiveUiState(
+                isLoading = false,
+                isEnrolled = true,
+                error = if (error is HttpException && error.code() == 401) {
+                    "Device authentication needs attention. Enrolment has been preserved."
+                } else {
+                    "Connection unavailable. Enrolment has been preserved; retry when online."
+                },
+            )
         }
     }
 
