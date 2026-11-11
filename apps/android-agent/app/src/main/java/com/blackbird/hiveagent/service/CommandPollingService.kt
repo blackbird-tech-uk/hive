@@ -14,6 +14,8 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.blackbird.hiveagent.BuildConfig
+import com.blackbird.hiveagent.scan.ScanActivityObserver
 import com.blackbird.hiveagent.api.DeviceLocationUpload
 import com.blackbird.hiveagent.api.HiveApiClient
 import com.blackbird.hiveagent.commands.CommandProcessor
@@ -46,6 +48,7 @@ class CommandPollingService : Service() {
     private lateinit var locationManager: LocationManager
     private lateinit var telemetryQueue: TelemetryQueue
     private var lastLocationUploadAt = 0L
+    private var scanActivityObserver: ScanActivityObserver? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -61,6 +64,11 @@ class CommandPollingService : Service() {
             apiClient = apiClient,
         )
 
+        if (BuildConfig.SCAN_OBSERVER_ENABLED) {
+            scanActivityObserver = ScanActivityObserver(applicationContext).also { it.start() }
+            Log.i(LOG_TAG, "Read-only scan observer enabled; barcode values are never accessed")
+        }
+
         createNotificationChannel()
 
         startForeground(
@@ -74,6 +82,8 @@ class CommandPollingService : Service() {
     }
 
     override fun onDestroy() {
+        scanActivityObserver?.stop()
+        scanActivityObserver = null
         serviceJob.cancel()
         super.onDestroy()
     }

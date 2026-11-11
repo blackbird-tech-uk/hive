@@ -5,6 +5,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val hiveScanObserverEnabled = providers.gradleProperty("hiveScanObserverEnabled")
+    .orElse("false")
+    .get().toBoolean()
+
 val hiveApiBaseUrl =
     providers.gradleProperty("hiveApiBaseUrl")
         .orElse(providers.environmentVariable("HIVE_API_BASE_URL"))
@@ -21,6 +25,8 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        buildConfigField("boolean", "SCAN_OBSERVER_ENABLED", "$hiveScanObserverEnabled")
 
         buildConfigField(
             "String",
