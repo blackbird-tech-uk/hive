@@ -56,10 +56,16 @@ class HeartbeatWorker(
             val apiClient = HiveApiClient(baseUrl = tokenStorage.getServerUrl().trimEnd('/'))
             val commandProcessor = CommandProcessor(context = applicationContext, apiClient = apiClient)
             if (shouldRenew(deviceToken)) {
-                val renewed = apiClient.renewDeviceToken(deviceToken)
-                tokenStorage.saveDeviceToken(renewed)
-                deviceToken = renewed
-                Log.d(LOG_TAG, "Device credentials renewed before expiry")
+                try {
+                    val renewed = apiClient.renewDeviceToken(deviceToken)
+                    tokenStorage.saveDeviceToken(renewed)
+                    deviceToken = renewed
+                    Log.d(LOG_TAG, "Device credentials renewed before expiry")
+                } catch (renewalError: Exception) {
+                    // A temporary renewal outage must not stop a valid token's heartbeat.
+                    // The next scheduled heartbeat will try renewal again.
+                    Log.w(LOG_TAG, "Token renewal failed; attempting heartbeat with stored credentials", renewalError)
+                }
             }
             Log.d(
                 LOG_TAG,
