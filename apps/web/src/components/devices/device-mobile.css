@@ -1,0 +1,42 @@
+/* Dedicated scanner cards on narrow screens; desktop table is unchanged. */
+.mobile-device-list { display: none; }
+@media (max-width: 767px) {
+  .device-table-wrapper { overflow: visible; min-width: 0; }
+  .device-table-wrapper > .device-table { display: none; }
+  .mobile-device-list { display: grid; gap: 12px; width: 100%; min-width: 0; }
+  .mobile-device-card { min-width: 0; padding: 16px; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; background: #19191d; }
+  .mobile-device-card-header { display: flex; align-items: flex-start; gap: 10px; }
+  .mobile-device-card-header input { margin-top: 5px; accent-color: #d4aa46; }
+  .mobile-device-identity { display: grid; gap: 3px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+  .mobile-device-identity strong { font-size: 16px; }
+  .mobile-device-identity span { color: #a4a4ae; font-size: 12px; }
+  .mobile-device-card-header .connection-status { flex-shrink: 0; font-size: 12px; }
+  .mobile-device-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 16px 0; }
+  .mobile-device-metrics > div { display: grid; gap: 4px; min-width: 0; }
+  .mobile-device-metrics small { color: #a4a4ae; font-size: 12px; }
+  .mobile-device-metrics strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+  .mobile-device-open { width: 100%; padding: 12px; border: 1px solid #b58d36; border-radius: 10px; background: rgba(181,141,54,.12); color: #f0ca71; font: inherit; font-weight: 600; cursor: pointer; }
+  .mobile-device-open:focus-visible { outline: 2px solid #f0ca71; outline-offset: 3px; }
+}
+
+@media (max-width: 767px) {
+  .mobile-device-select-all {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid #38383e;
+    border-radius: 10px;
+    background: #171719;
+    color: #f0ca71;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mobile-device-select-all:focus-visible { outline: 2px solid #f0ca71; outline-offset: 2px; }
+  .mobile-device-card-header .connection-status { max-width: 88px; white-space: nowrap; }
+  .mobile-device-open { min-height: 44px; }
+}
+@media (max-width: 360px) {
+  .mobile-device-card { padding: 12px; }
+  .mobile-device-metrics { gap: 10px; }
+}

@@ -3833,3 +3833,80 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Mobile shell: keep organisation controls in page flow and nav off content. */
+.app-mobile-organization { display: none; }
+@media (max-width: 640px) {
+  .app-sidebar .app-organization { display: none; }
+  .app-mobile-organization {
+    display: grid;
+    gap: 7px;
+    margin-bottom: 20px;
+    min-width: 0;
+  }
+  .app-mobile-organization label {
+    color: #a1a1aa;
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+  }
+  .app-mobile-organization select {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid #34343a;
+    border-radius: 10px;
+    background: #19191c;
+    color: #f4f4f5;
+    font: inherit;
+  }
+  .app-sidebar { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .app-sidebar-navigation {
+    gap: 3px;
+    max-width: 100vw;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  .app-sidebar-link {
+    min-width: 62px;
+    min-height: 48px;
+    flex: 0 0 auto;
+    padding: 10px 8px;
+  }
+  .app-shell-main {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    overflow-wrap: anywhere;
+  }
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 360px) {
+  .metric-grid { grid-template-columns: 1fr; }
+}
+
+/* Mobile detail sheets and dashboard polish. */
+@media (max-width: 767px) {
+  .device-list-toolbar { flex-wrap: wrap; align-items: stretch; }
+  .device-search { width: 100%; min-width: 0; }
+  .device-search-result-count { flex: 1 1 auto; }
+  .device-details-panel {
+    width: min(100%, 100vw);
+    max-width: 100vw;
+    max-height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+  .device-details-header-actions,
+  .device-edit-actions,
+  .device-details-footer { flex-wrap: wrap; }
+  .device-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .device-action-grid button { min-height: 44px; white-space: normal; }
+  .metric-card { min-width: 0; }
+  .metric-card strong { overflow-wrap: anywhere; }
+}
+@media (max-width: 380px) {
+  .device-action-grid { grid-template-columns: 1fr; }
+}
