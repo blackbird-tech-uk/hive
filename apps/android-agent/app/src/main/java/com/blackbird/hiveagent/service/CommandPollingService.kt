@@ -44,6 +44,7 @@ class CommandPollingService : Service() {
     private lateinit var deviceInfoProvider: DeviceInfoProvider
     private lateinit var commandProcessor: CommandProcessor
     private lateinit var locationManager: LocationManager
+    private lateinit var scanActivityProbe: ScanActivityProbe
     private lateinit var telemetryQueue: TelemetryQueue
     private var lastLocationUploadAt = 0L
 
@@ -56,6 +57,8 @@ class CommandPollingService : Service() {
             DeviceInfoProvider(applicationContext)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         telemetryQueue = TelemetryQueue(applicationContext)
+        scanActivityProbe = ScanActivityProbe(applicationContext)
+        scanActivityProbe.start()
         commandProcessor = CommandProcessor(
             context = applicationContext,
             apiClient = apiClient,
@@ -74,6 +77,7 @@ class CommandPollingService : Service() {
     }
 
     override fun onDestroy() {
+        scanActivityProbe.stop()
         serviceJob.cancel()
         super.onDestroy()
     }
