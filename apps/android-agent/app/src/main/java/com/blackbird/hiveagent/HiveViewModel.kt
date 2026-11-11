@@ -6,6 +6,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.blackbird.hiveagent.api.HiveApiClient
 import com.blackbird.hiveagent.data.local.TokenStorage
 import com.blackbird.hiveagent.data.network.ApiClient
 import com.blackbird.hiveagent.data.network.DeviceAgentResponse
@@ -268,6 +269,36 @@ loadDeviceWithToken(
                         isEnrolled = false,
                         error = readableError(error),
                     )
+            }
+        }
+    }
+
+    fun syncDevice() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                val token = tokenStorage.getDeviceToken()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: throw IllegalStateException("No stored enrolment to sync.")
+                val serverUrl = tokenStorage.getServerUrl()
+                val refreshedToken = try {
+                    HiveApiClient(baseUrl = serverUrl).renewDeviceToken(token)
+                } catch (error: Exception) {
+                    // A still-valid token may work even when renewal is unavailable.
+                    Log.w(LOG_TAG, "Renewal unavailable during manual sync", error)
+                    token
+                }
+                if (refreshedToken != token) {
+                    tokenStorage.saveDeviceToken(refreshedToken)
+                }
+                loadDeviceWithToken(refreshedToken, serverUrl)
+            } catch (error: Exception) {
+                Log.w(LOG_TAG, "Manual sync failed; enrolment preserved", error)
+                _uiState.value = HiveUiState(
+                    isLoading = false,
+                    isEnrolled = true,
+                    error = "Sync failed. Your enrolment is saved; check connectivity and retry.",
+                )
             }
         }
     }
