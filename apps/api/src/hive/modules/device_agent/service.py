@@ -158,6 +158,9 @@ class DeviceAgentService:
                 now=now,
             )
 
+            # Do not redeliver commands with unknown execution outcomes.
+            self.commands.expire_unconfirmed_for_device(device.id)
+
             pending_commands = (
                 self.commands
                 .list_pending_for_device(
