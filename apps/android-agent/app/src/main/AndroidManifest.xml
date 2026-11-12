@@ -65,6 +65,10 @@
         android:usesCleartextTraffic="true">
 
         <receiver
+            android:name=".commands.StopRingReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".BootReceiver"
             android:enabled="true"
             android:exported="true">
