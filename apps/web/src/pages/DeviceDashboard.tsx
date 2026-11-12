@@ -244,7 +244,7 @@ const [locationError, setLocationError] =
   useState<string | null>(null)
 
   const loadDevice = useCallback(
-  async () => {
+  async (silent = false) => {
     if (!deviceId) {
       setError(
         'No device ID was provided.',
@@ -254,7 +254,7 @@ const [locationError, setLocationError] =
     }
 
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
 
       const loadedDevice =
         await getDevice(deviceId)
@@ -270,7 +270,7 @@ const [locationError, setLocationError] =
           : 'Unable to load this device.',
       )
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   },
   [deviceId],
@@ -535,7 +535,7 @@ useEffect(() => {
 useEffect(() => {
   const timer = window.setInterval(() => {
     setNow(Date.now())
-    void loadDevice()
+    void loadDevice(true)
   }, 15_000)
   return () => window.clearInterval(timer)
 }, [loadDevice])
