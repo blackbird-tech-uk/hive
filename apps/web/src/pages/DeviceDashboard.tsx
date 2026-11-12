@@ -1,4 +1,6 @@
-﻿import {
+﻿import { MapContainer, Marker, TileLayer } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import {
   ArrowLeft,
   BatteryCharging,
   Bell,
@@ -177,7 +179,7 @@ function getCommandActivityTime(
 
 export function DeviceDashboardPage() {
 const [activeTab, setActiveTab] =
-  useState<'overview' | 'activity' | 'applications'>(
+  useState<'overview' | 'activity' | 'applications' | 'location'>(
     'overview',
   )
 
@@ -233,6 +235,7 @@ const [commandsError, setCommandsError] =
 
     const [location, setLocation] =
   useState<DeviceLocation | null>(null)
+const [locationHistory, setLocationHistory] = useState<DeviceLocation[]>([])
 
 const [locationLoading, setLocationLoading] =
   useState(false)
@@ -327,13 +330,15 @@ const loadLocation = useCallback(
       const locations =
         await getDeviceLocationHistory(
           deviceId,
-          1,
+          100,
         )
 
+      setLocationHistory(locations.filter((item, index, all) => all.findIndex((other) => other.recorded_at === item.recorded_at && other.latitude === item.latitude && other.longitude === item.longitude) === index))
       setLocation(locations[0] ?? null)
       setLocationError(null)
     } catch (loadError) {
       setLocation(null)
+      setLocationHistory([])
 
       setLocationError(
         loadError instanceof Error
@@ -1192,8 +1197,8 @@ useEffect(() => {
         </button>
 
         <button
-          className="device-dashboard-tab"
-          disabled
+          className={activeTab === 'location' ? 'device-dashboard-tab device-dashboard-tab-active' : 'device-dashboard-tab'}
+          onClick={() => { setActiveTab('location'); void loadLocation(true) }}
           type="button"
         >
           Location
@@ -1207,6 +1212,40 @@ useEffect(() => {
           Notes
         </button>
       </nav>
+
+      {activeTab === 'location' && (
+        <section className="device-dashboard-panel" aria-label="Device location history">
+          <div className="device-dashboard-panel-header">
+            <div><p className="eyebrow">LAST REPORTED POSITION</p><h2>Location history</h2></div>
+            <button className="secondary-button" type="button" disabled={locationLoading} onClick={() => void loadLocation(true)}>
+              <RefreshCw size={16} /> {locationLoading ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+          {locationError && <p role="alert">{locationError}</p>}
+          {!locationLoading && !location && !locationError && <p>No GPS location has been reported for this device yet.</p>}
+          {location && (
+            <>
+              <p>Last reported {formatDateTime(location.recorded_at)} · Accuracy {location.accuracy == null ? 'unknown' : `±${Math.round(location.accuracy)} m`}. This is not live tracking.</p>
+              <div style={{height: 340, width: '100%', marginTop: 16, marginBottom: 16}}>
+                <MapContainer key={`${location.latitude},${location.longitude}`} center={[location.latitude, location.longitude]} zoom={16} scrollWheelZoom={false} style={{height: '100%', width: '100%'}}>
+                  <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <Marker position={[location.latitude, location.longitude]} />
+                </MapContainer>
+              </div>
+              <p>Coordinates: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)} · <a href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`} target="_blank" rel="noreferrer">Open in Google Maps</a></p>
+              <h3>Recent reports</h3>
+              <div className="device-dashboard-information">
+                {locationHistory.slice(0, 20).map((item) => (
+                  <div key={item.id}>
+                    <dt>{formatDateTime(item.recorded_at)}</dt>
+                    <dd>{item.latitude.toFixed(5)}, {item.longitude.toFixed(5)} {item.accuracy == null ? '' : `· ±${Math.round(item.accuracy)} m`}</dd>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {activeTab === 'overview' && (
         <div className="device-dashboard-layout">
