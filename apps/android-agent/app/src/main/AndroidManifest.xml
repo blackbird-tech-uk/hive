@@ -64,6 +64,11 @@
         android:theme="@style/Theme.HiveAgent"
         android:usesCleartextTraffic="true">
 
+        <activity
+            android:name=".notifications.MessageActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.Light.Dialog.Alert" />
+
         <receiver
             android:name=".commands.StopRingReceiver"
             android:exported="false" />
