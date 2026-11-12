@@ -11,7 +11,7 @@ import {
 import type { Device } from '../../lib/api'
 import { StatusBadge } from './StatusBadge'
 
-const ONLINE_THRESHOLD_MS = 20 * 60 * 1_000
+const ONLINE_THRESHOLD_MS = 2 * 60 * 1_000
 
 interface DeviceTableProps {
   devices: Device[]
