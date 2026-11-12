@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.time.Instant
 import kotlin.coroutines.resume
@@ -75,6 +76,12 @@ class CommandPollingService : Service() {
         serviceScope.launch {
             locationLoop()
         }
+    }
+
+    // Ask Android to recreate the service after an unexpected process kill.
+    // This is best-effort: Doze and platform foreground-service rules still apply.
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -214,7 +221,9 @@ class CommandPollingService : Service() {
         ) == PackageManager.PERMISSION_GRANTED
         if (!fineGranted && !coarseGranted) return
 
-        val location = currentLocation() ?: latestKnownLocation() ?: return
+        val location = withTimeoutOrNull(LOCATION_REQUEST_TIMEOUT_MS) {
+            currentLocation()
+        } ?: latestKnownLocation() ?: return
         val payload = DeviceLocationUpload(
             latitude = location.latitude,
             longitude = location.longitude,
@@ -349,6 +358,8 @@ class CommandPollingService : Service() {
 
         private const val POLL_INTERVAL_MS =
             10_000L
+
+        private const val LOCATION_REQUEST_TIMEOUT_MS = 15_000L
 
         private const val LOCATION_UPLOAD_INTERVAL_MS =
             60_000L
