@@ -451,62 +451,81 @@ class CommandProcessor(
             )
 
         val ringtone = alarmUri?.let { uri ->
-            RingtoneManager.getRingtone(
-                context,
-                uri,
-            )
-        }
+            RingtoneManager.getRingtone(context, uri)
+        } ?: return failure(
+            "No alarm or ringtone was available on the device.",
+        )
 
-        if (ringtone == null) {
-            return failure(
-                "No alarm or ringtone was available on the device.",
+        val vibrator = getVibrator()
+        RingControl.begin()
+        val manager = context.getSystemService(
+            Context.NOTIFICATION_SERVICE,
+        ) as android.app.NotificationManager
+        val channelId = "hive_ring_alert"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                android.app.NotificationChannel(
+                    channelId, "HIVE device ring",
+                    android.app.NotificationManager.IMPORTANCE_HIGH,
+                ),
             )
         }
+        val stopIntent = Intent(context, StopRingReceiver::class.java).apply {
+            action = StopRingReceiver.ACTION_STOP_RING
+        }
+        val pendingStop = android.app.PendingIntent.getBroadcast(
+            context, 701, stopIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = androidx.core.app.NotificationCompat.Builder(
+            context, channelId,
+        )
+            .setSmallIcon(android.R.drawable.ic_lock_silent_mode_off)
+            .setContentTitle("HIVE: Device ringing")
+            .setContentText("Tap Stop Ring to silence this device.")
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(true)
+            .addAction(android.R.drawable.ic_media_pause, "Stop Ring", pendingStop)
+            .build()
 
         return try {
+            manager.notify(701, notification)
             ringtone.audioAttributes =
                 AudioAttributes.Builder()
-                    .setUsage(
-                        AudioAttributes.USAGE_ALARM,
-                    )
+                    .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(
                         AudioAttributes.CONTENT_TYPE_SONIFICATION,
                     )
                     .build()
 
-            val vibrator = getVibrator()
-
             vibrator?.vibrate(
                 VibrationEffect.createWaveform(
-                    longArrayOf(
-                        0L,
-                        750L,
-                        250L,
-                        750L,
-                        250L,
-                    ),
+                    longArrayOf(0L, 750L, 250L, 750L, 250L),
                     0,
                 ),
             )
-
             ringtone.play()
 
-            delay(30_000L)
-
+            // Always stop automatically; no reboot should be necessary.
+            for (step in 1..20) {
+                if (RingControl.shouldStop()) break
+                delay(500L)
+            }
+            success("Device ring stopped (maximum 10 seconds).")
+        } catch (exception: kotlinx.coroutines.CancellationException) {
+            // Propagate service shutdown while still stopping the alarm.
+            throw exception
+        } catch (exception: Exception) {
+            failure(
+                exception.message ?: "Unable to ring the device.",
+            )
+        } finally {
+            // Runs even when the polling service is cancelled or destroyed.
             ringtone.stop()
             vibrator?.cancel()
-
-            success(
-                "Device rang for 30 seconds.",
-            )
-        } catch (exception: Exception) {
-            ringtone.stop()
-            getVibrator()?.cancel()
-
-            failure(
-                exception.message
-                    ?: "Unable to ring the device.",
-            )
+            manager.cancel(701)
+            RingControl.stop()
         }
     }
 

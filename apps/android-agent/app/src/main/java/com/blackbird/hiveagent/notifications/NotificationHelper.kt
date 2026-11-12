@@ -32,6 +32,21 @@ class NotificationHelper(
             Context.NOTIFICATION_SERVICE,
         ) as NotificationManager
 
+        val messageIntent = android.content.Intent(
+            context, MessageActivity::class.java,
+        ).apply {
+            putExtra(MessageActivity.EXTRA_TITLE, title)
+            putExtra(MessageActivity.EXTRA_MESSAGE, message)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val pendingMessage = android.app.PendingIntent.getActivity(
+            context,
+            System.currentTimeMillis().toInt(),
+            messageIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+
         val notification = NotificationCompat.Builder(
             context,
             CHANNEL_ID,
@@ -43,6 +58,8 @@ class NotificationHelper(
                 NotificationCompat.BigTextStyle().bigText(message),
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingMessage)
+            .addAction(android.R.drawable.ic_dialog_info, "Read and acknowledge", pendingMessage)
             .setAutoCancel(true)
             .build()
 

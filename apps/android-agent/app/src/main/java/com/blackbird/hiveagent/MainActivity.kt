@@ -225,23 +225,30 @@ fun HiveAgentScreen(
 
 @Composable
 private fun LoadingScreen() {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-        verticalArrangement =
-            Arrangement.Center,
+    val yellow = androidx.compose.ui.graphics.Color(0xFFFFCA28)
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier.fillMaxSize()
+            .then(Modifier)
+            .padding(24.dp),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
     ) {
-        CircularProgressIndicator()
-
-        Spacer(
-            modifier =
-                Modifier.height(16.dp),
-        )
-
-        Text("Connecting to Hiveâ€¦")
+        Column(
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(R.drawable.hive_mark),
+                contentDescription = "HIVE Agent",
+                modifier = Modifier.height(140.dp),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("HIVE", style = MaterialTheme.typography.headlineLarge)
+            Text("A G E N T", color = yellow)
+            Spacer(modifier = Modifier.height(32.dp))
+            CircularProgressIndicator(color = yellow)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Connecting to HIVE…")
+        }
     }
 }
 
