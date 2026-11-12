@@ -71,6 +71,10 @@ class CommandPollingService : Service() {
         serviceScope.launch {
             pollLoop()
         }
+
+        serviceScope.launch {
+            locationLoop()
+        }
     }
 
     override fun onDestroy() {
@@ -111,9 +115,6 @@ class CommandPollingService : Service() {
                 stopSelf()
                 return
             }
-
-        flushQueuedLocations(deviceToken)
-        uploadLatestLocationIfDue(deviceToken)
 
         val heartbeat =
             apiClient.sendHeartbeat(
@@ -178,6 +179,26 @@ class CommandPollingService : Service() {
         }
     }
 
+
+    // Location requests can block for a long time when the screen is locked.
+    // Keep them off the command/heartbeat polling coroutine.
+    private suspend fun locationLoop() {
+        while (serviceScope.isActive) {
+            try {
+                val deviceToken = tokenStorage.deviceToken.first()
+                    ?.trim()?.takeIf { it.isNotEmpty() }
+                if (deviceToken != null) {
+                    flushQueuedLocations(deviceToken)
+                    uploadLatestLocationIfDue(deviceToken)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.w(LOG_TAG, "Location collection failed", error)
+            }
+            delay(LOCATION_UPLOAD_INTERVAL_MS)
+        }
+    }
 
     private suspend fun uploadLatestLocationIfDue(deviceToken: String) {
         val now = System.currentTimeMillis()
