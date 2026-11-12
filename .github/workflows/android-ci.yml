@@ -21,3 +21,10 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
       - run: gradle :app:assembleDebug
+      - name: Publish debug APK for device testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: hive-agent-debug-${{ github.run_number }}
+          path: apps/android-agent/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14

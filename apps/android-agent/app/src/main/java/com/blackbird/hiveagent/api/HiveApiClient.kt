@@ -16,6 +16,17 @@ class HiveApiException(
 class HiveApiClient(
     private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/'),
 ) {
+    suspend fun renewDeviceToken(deviceToken: String): String {
+        val response = post(
+            path = "/enrollment/renew",
+            token = deviceToken,
+            body = null,
+        )
+        return response.getString("device_token").trim().also {
+            require(it.isNotEmpty()) { "Hive returned an empty renewed token." }
+        }
+    }
+
     suspend fun sendHeartbeat(
         deviceToken: String,
         payload: DeviceHeartbeatRequest,

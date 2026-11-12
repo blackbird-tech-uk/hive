@@ -187,7 +187,7 @@ fun HiveAgentScreen(
             EnrolledDeviceScreen(
                 uiState = uiState,
                 onRefresh =
-                    hiveViewModel::loadDevice,
+                    hiveViewModel::syncDevice,
                 onClearEnrolment =
                     hiveViewModel::clearEnrolment,
                 isDeviceAdminActive =
@@ -208,6 +208,21 @@ fun HiveAgentScreen(
 
                     deviceAdminLauncher.launch(intent)
                 },            )
+        }
+
+        uiState.isEnrolled -> {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("Scanner enrolment saved", style = MaterialTheme.typography.titleLarge)
+                Text(uiState.error ?: "HIVE could not load the device details.")
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = hiveViewModel::syncDevice,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Sync now") }
+            }
         }
 
         else -> {
@@ -613,7 +628,7 @@ private fun EnrolledDeviceScreen(
             modifier =
                 Modifier.fillMaxWidth(),
         ) {
-            Text("Refresh")
+            Text("Sync now")
         }
 
         OutlinedButton(
