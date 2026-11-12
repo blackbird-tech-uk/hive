@@ -13,6 +13,7 @@ import { DashboardPage } from '../pages/Dashboard'
 import { DeviceDashboardPage } from '../pages/DeviceDashboard'
 import { DevicesPage } from '../pages/Devices'
 import { FleetMapPage } from '../pages/FleetMap'
+import { InventoryPage } from '../pages/Inventory'
 import { EnrollmentsPage } from '../pages/Enrollments'
 import { LoginPage } from '../pages/Login'
 
@@ -93,6 +94,8 @@ function ProtectedApplication() {
           path="/devices"
           element={<DevicesPage />}
         />
+
+        <Route path="/inventory" element={<InventoryPage />} />
 
         <Route
           path="/map"
