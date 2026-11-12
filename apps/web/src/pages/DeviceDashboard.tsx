@@ -40,7 +40,7 @@ import {
 
 
 const DEVICE_ONLINE_THRESHOLD_MS =
-  20 * 60 * 1_000
+  2 * 60 * 1_000
 
 function isDeviceOnline(
   device: Device,
@@ -197,6 +197,9 @@ const [activeTab, setActiveTab] =
     string | null
   >(null)
 
+  const [now, setNow] = useState(() => Date.now())
+  const [syncCommandId, setSyncCommandId] = useState<string | null>(null)
+
   const [sendingCommand, setSendingCommand] =
     useState<string | null>(null)
 
@@ -244,7 +247,7 @@ const [locationError, setLocationError] =
   useState<string | null>(null)
 
   const loadDevice = useCallback(
-  async () => {
+  async (silent = false) => {
     if (!deviceId) {
       setError(
         'No device ID was provided.',
@@ -254,7 +257,7 @@ const [locationError, setLocationError] =
     }
 
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
 
       const loadedDevice =
         await getDevice(deviceId)
@@ -270,7 +273,7 @@ const [locationError, setLocationError] =
           : 'Unable to load this device.',
       )
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   },
   [deviceId],
@@ -380,6 +383,10 @@ const loadLocation = useCallback(
             createdCommand.id,
         ),
       ])
+
+      if (command === 'SYNC') {
+        setSyncCommandId(createdCommand.id)
+      }
 
       if (command === 'REQUEST_LOCATION') {
         window.setTimeout(() => {
@@ -530,6 +537,14 @@ useEffect(() => {
   }
 }, [loadCommands])
 
+useEffect(() => {
+  const timer = window.setInterval(() => {
+    setNow(Date.now())
+    void loadDevice(true)
+  }, 15_000)
+  return () => window.clearInterval(timer)
+}, [loadDevice])
+
   if (loading) {
     return (
       <section className="device-dashboard-state">
@@ -571,6 +586,10 @@ useEffect(() => {
   }
 
   const online = isDeviceOnline(device)
+  const heartbeatAgeMs = device.last_seen_at ? now - new Date(device.last_seen_at).getTime() : Number.POSITIVE_INFINITY
+  const connectionHealth = !Number.isFinite(heartbeatAgeMs) ? 'Never connected' : heartbeatAgeMs <= 60_000 ? 'Healthy' : heartbeatAgeMs <= DEVICE_ONLINE_THRESHOLD_MS ? 'Delayed' : 'Offline'
+  const syncCommand = commands.find((command) => command.id === syncCommandId)
+  const syncStatus = syncCommand?.status ?? null
 
   return (
     <section className="device-dashboard-page">
@@ -675,6 +694,17 @@ useEffect(() => {
         </div>
 
         <div className="device-dashboard-action-grid">
+          <button
+            className="device-dashboard-action"
+            disabled={sendingCommand !== null}
+            onClick={() => void sendCommand('SYNC')}
+            type="button"
+          >
+            <RefreshCw aria-hidden="true" size={20} />
+            <span><strong>{sendingCommand === 'SYNC' ? 'Queuing...' : 'Sync now'}</strong>
+              <small>Ask the agent to check in</small>
+            </span>
+          </button>
           <button
             className="device-dashboard-action"
             disabled={sendingCommand !== null}
@@ -869,6 +899,12 @@ useEffect(() => {
           </button>
         </div>
 
+        <p className="device-dashboard-command-notice" role="status">
+          Connection: {connectionHealth} · Last heartbeat: {formatRelativeTime(device.last_seen_at)}
+          {syncCommandId ? ` · Sync request: ${syncStatus ?? 'Checking...'}` : ''}
+          {syncStatus === 'completed' ? ' (agent confirmed)' : ''}
+          {syncStatus === 'failed' ? ' (check activity for details)' : ''}
+        </p>
         {commandNotice && (
           <p
             className="device-dashboard-command-notice"
