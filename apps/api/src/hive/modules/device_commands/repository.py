@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -64,6 +64,38 @@ class DeviceCommandRepository:
         )
 
         return self.db.scalars(statement).all()
+
+    def expire_unconfirmed_for_device(
+        self,
+        device_id: uuid.UUID,
+        *,
+        older_than_minutes: int = 30,
+    ) -> int:
+        """Mark stale delivered commands as unconfirmed; never replay them.
+
+        A device may have executed a command even when its result was lost.
+        Avoid automatic retries, especially for lock and reboot commands.
+        """
+        cutoff = datetime.now(UTC) - timedelta(minutes=older_than_minutes)
+        statement = select(DeviceCommand).where(
+            DeviceCommand.device_id == device_id,
+            DeviceCommand.status.in_([
+                DeviceCommandStatus.SENT,
+                DeviceCommandStatus.ACKNOWLEDGED,
+            ]),
+            DeviceCommand.sent_at < cutoff,
+        )
+        stale = self.db.scalars(statement).all()
+        for command in stale:
+            command.status = DeviceCommandStatus.FAILED
+            command.result_message = (
+                "Result unconfirmed after 30 minutes; command may have "
+                "executed. Do not automatically retry."
+            )
+            command.completed_at = datetime.now(UTC)
+        if stale:
+            self.db.flush()
+        return len(stale)
 
     def mark_sent(
         self,
