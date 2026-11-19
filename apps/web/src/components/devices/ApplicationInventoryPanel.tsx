@@ -50,6 +50,14 @@ export function ApplicationInventoryPanel({
   const [filter, setFilter] =
     useState<ApplicationFilter>('all')
 
+  // App inventory is a snapshot. A missing entry is only meaningful after an inventory was reported.
+  const requiredApps = [
+    { label: 'Google Chrome', matches: (app: InstalledApplication) => app.package_name === 'com.android.chrome' },
+    { label: 'SmartScan', matches: (app: InstalledApplication) =>
+      /smart\\s?scan/i.test(app.app_name ?? '') || /smartscan/i.test(app.package_name) },
+  ]
+  const hasInventory = applications.length > 0
+
   const filteredApplications = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
 
@@ -139,6 +147,19 @@ export function ApplicationInventoryPanel({
             size={17}
           />
         </button>
+      </div>
+
+      <div className="device-applications-summary" aria-label="Required app health">
+        <h3>Required apps for show readiness</h3>
+        <p>Based on the latest reported app inventory. This does not verify Google Play sign-in or confirm the apps can scan a badge.</p>
+        {requiredApps.map(({ label, matches }) => {
+          const app = applications.find(matches)
+          const status = !hasInventory ? 'Not verified — no app inventory' : !app ? 'Not found in reported inventory' : app.is_enabled ? 'Installed and enabled' : 'Installed but disabled'
+          return (
+            <p key={label}><strong>{label}:</strong> {status}{app?.version_name ? ` (v${app.version_name})` : ''}</p>
+          )
+        })}
+        <p>SmartScan detection uses its reported app name or package. Confirm its package identifier on LB164 before treating missing results as definitive.</p>
       </div>
 
       <div className="device-applications-toolbar">
