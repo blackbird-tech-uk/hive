@@ -9,6 +9,7 @@ from hive.modules.assignments.models import Assignment
 from hive.modules.device_locations.models import DeviceLocation
 from hive.modules.device_commands.models import DeviceCommand
 from hive.modules.devices.models import Device
+from hive.modules.inspections.models import ScannerInspection
 from hive.modules.enrollment.models import EnrollmentToken
 from hive.modules.events.models import Event
 from hive.modules.organizations.models import (
