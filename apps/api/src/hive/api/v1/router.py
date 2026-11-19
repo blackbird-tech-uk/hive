@@ -17,8 +17,8 @@ from hive.modules.enrollment.router import (
     router as enrollment_router,
 )
 from hive.modules.events.router import router as events_router
-from hive.modules.inventory.router import router as inventory_router
 from hive.modules.inspections.router import router as inspections_router
+from hive.modules.inventory.router import router as inventory_router
 from hive.modules.organizations.router import (
     router as organizations_router,
 )
