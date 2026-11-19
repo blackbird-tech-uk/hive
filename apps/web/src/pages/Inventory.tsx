@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, ClipboardCheck, RefreshCw, Search, Package } from 'lucide-react'
 import { TopBar } from '../components/layout/TopBar'
-import { getDevices, type Device } from '../lib/api'
+import { getAssignments, getDevices, getEvents, type Assignment, type Event, type Device } from '../lib/api'
 
 const IDLE_WARNING_DAYS = 30
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -21,6 +21,10 @@ function readiness(device: Device, now: number): 'never' | 'idle' | 'recent' {
 export function InventoryPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [query, setQuery] = useState('')
+  const [events, setEvents] = useState<Event[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [eventFilter, setEventFilter] = useState('all')
+  const [batteryFilter, setBatteryFilter] = useState(false)
   const [readinessFilter, setReadinessFilter] = useState<'all' | 'attention'>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +33,10 @@ export function InventoryPage() {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      setDevices(await getDevices())
+      const [fleet, eventList, assignmentList] = await Promise.all([getDevices(), getEvents(), getAssignments()])
+      setDevices(fleet)
+      setEvents(eventList)
+      setAssignments(assignmentList)
       setNow(Date.now())
       setError(null)
     } catch (reason) {
@@ -43,9 +50,11 @@ export function InventoryPage() {
 
   const filtered = useMemo(() => devices.filter((device) =>
     (readinessFilter === 'all' || readiness(device, now) !== 'recent') &&
+    (!batteryFilter || (device.battery_level !== null && device.battery_level < 30)) &&
+    (eventFilter === 'all' || assignments.some((assignment) => assignment.device_id === device.id && assignment.event_id === eventFilter && assignment.status === 'assigned')) &&
     [device.asset_id, device.hive_id, device.serial_number, device.model, device.condition, device.status]
       .some((value) => value?.toLowerCase().includes(query.toLowerCase().trim())),
-  ), [devices, query, readinessFilter, now])
+  ), [devices, query, readinessFilter, now, batteryFilter, eventFilter, assignments])
 
   const needingAttention = devices.filter((device) =>
     device.condition !== 'good' || device.status === 'repair' || device.status === 'lost',
@@ -88,9 +97,15 @@ export function InventoryPage() {
             <Search size={18} aria-hidden="true" />
             <input aria-label="Search inventory" placeholder="Search asset ID, serial, model or condition" type="search" value={query} onChange={(event) => setQuery(event.target.value)} />
           </div>
+          <label>Event <select aria-label="Filter by event" value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
+            <option value="all">All events</option>
+            {events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+          </select></label>
+          <label><input type="checkbox" checked={batteryFilter} onChange={(event) => setBatteryFilter(event.target.checked)} /> Battery below 30%</label>
           <button className="secondary-button" type="button" aria-pressed={readinessFilter === 'attention'} onClick={() => setReadinessFilter((current) => current === 'all' ? 'attention' : 'all')}>{readinessFilter === 'attention' ? 'Show all' : 'Show idle / never seen'}</button>
           <button className="secondary-button" type="button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={16}/> Refresh</button>
         </div>
+        <p>{filtered.length} of {devices.length} scanners shown. Event filter includes currently assigned scanners only. Battery filter excludes devices with no reported battery reading.</p>
         <div style={{overflowX: 'auto'}}>
           <table style={{width: '100%', textAlign: 'left', borderCollapse: 'separate', borderSpacing: '0 12px'}}>
             <thead><tr><th>Asset</th><th>Model</th><th>Serial</th><th>Condition</th><th>Status</th><th>Readiness check</th><th>Last seen</th><th>Details</th></tr></thead>
