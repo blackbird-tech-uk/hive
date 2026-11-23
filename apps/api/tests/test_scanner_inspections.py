@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from hive.api.v1.router import api_router
+from hive.main import app
 from hive.modules.inspections.models import ScannerInspection
 from hive.modules.inspections.schemas import InspectionCreate, InspectionResponse
 
@@ -54,9 +54,9 @@ def test_inspection_response_includes_server_attribution() -> None:
 def test_inspection_routes_registered() -> None:
     paths = {
         (route.path, method)
-        for route in api_router.routes
+        for route in app.routes
         for method in getattr(route, "methods", set())
     }
-    path = "/organizations/{organization_id}/devices/{device_id}/inspections"
+    path = "/api/v1/organizations/{organization_id}/devices/{device_id}/inspections"
     assert (path, "GET") in paths
     assert (path, "POST") in paths
