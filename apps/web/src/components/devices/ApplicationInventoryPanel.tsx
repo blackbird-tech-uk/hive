@@ -48,7 +48,7 @@ export function ApplicationInventoryPanel({
   const [searchQuery, setSearchQuery] =
     useState('')
   const [filter, setFilter] =
-    useState<ApplicationFilter>('all')
+    useState<ApplicationFilter>('user')
 
   // App inventory is a snapshot. A missing entry is only meaningful after an inventory was reported.
   const requiredApps = [
@@ -186,8 +186,8 @@ export function ApplicationInventoryPanel({
           }
           value={filter}
         >
-          <option value="all">All apps</option>
           <option value="user">User apps</option>
+          <option value="all">All apps</option>
           <option value="system">System apps</option>
           <option value="enabled">Enabled</option>
           <option value="disabled">Disabled</option>
