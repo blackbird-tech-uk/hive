@@ -50,13 +50,23 @@ export function ApplicationInventoryPanel({
   const [filter, setFilter] =
     useState<ApplicationFilter>('user')
 
-  // App inventory is a snapshot. A missing entry is only meaningful after an inventory was reported.
+  // Match exact package identifiers, including system applications.
+  // A reported inventory is a snapshot, not proof an app can scan a badge.
   const requiredApps = [
-    { label: 'Google Chrome', matches: (app: InstalledApplication) => app.package_name === 'com.android.chrome' },
-    { label: 'SmartScan', matches: (app: InstalledApplication) =>
-      /smart\\s?scan/i.test(app.app_name ?? '') || /smartscan/i.test(app.package_name) },
-  ]
+    { label: 'Google Chrome', packageName: 'com.android.chrome' },
+    { label: 'LiveScan', packageName: 'com.livebuzz.liveScan' },
+    { label: 'EntranceScan', packageName: 'com.livebuzz.entranceScan' },
+    { label: 'Unitech Scan Service', packageName: 'com.unitech.scanservice' },
+    { label: 'HIVE Agent', packageName: 'com.blackbird.hiveagent' },
+  ] as const
   const hasInventory = applications.length > 0
+  const requiredAppResults = requiredApps.map(({ label, packageName }) => ({
+    label,
+    packageName,
+    app: applications.find((item) => item.package_name === packageName),
+  }))
+  const readyCount = requiredAppResults.filter(({ app }) => app?.is_enabled).length
+  const allRequiredAppsReady = hasInventory && readyCount === requiredApps.length
 
   const filteredApplications = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -151,15 +161,32 @@ export function ApplicationInventoryPanel({
 
       <div className="device-applications-summary" aria-label="Required app health">
         <h3>Required apps for show readiness</h3>
-        <p>Based on the latest reported app inventory. This does not verify Google Play sign-in or confirm the apps can scan a badge.</p>
-        {requiredApps.map(({ label, matches }) => {
-          const app = applications.find(matches)
-          const status = !hasInventory ? 'Not verified — no app inventory' : !app ? 'Not found in reported inventory' : app.is_enabled ? 'Installed and enabled' : 'Installed but disabled'
+        <p>
+          {!hasInventory
+            ? 'Not verified — no app inventory reported.'
+            : allRequiredAppsReady
+              ? `All ${requiredApps.length} required apps are installed and enabled.`
+              : `${readyCount} of ${requiredApps.length} required apps installed and enabled — not ready.`}
+        </p>
+        <p>
+          Checks use exact package identifiers across user and system apps.
+          App inventory does not prove that sign-in, scanning or badge printing works.
+        </p>
+        {requiredAppResults.map(({ label, packageName, app }) => {
+          const status = !hasInventory
+            ? 'Not verified'
+            : !app
+              ? 'Missing from reported inventory'
+              : app.is_enabled
+                ? 'Installed and enabled'
+                : 'Installed but disabled'
           return (
-            <p key={label}><strong>{label}:</strong> {status}{app?.version_name ? ` (v${app.version_name})` : ''}</p>
+            <p key={packageName}>
+              <strong>{label}:</strong> {status}
+              {app?.version_name ? ` (v${app.version_name})` : ''}
+            </p>
           )
         })}
-        <p>SmartScan detection uses its reported app name or package. Confirm its package identifier on LB164 before treating missing results as definitive.</p>
       </div>
 
       <div className="device-applications-toolbar">
