@@ -57,6 +57,6 @@ def test_inspection_routes_registered() -> None:
         for route in api_router.routes
         for method in getattr(route, "methods", set())
     }
-    path = "/api/v1/organizations/{organization_id}/devices/{device_id}/inspections"
+    path = "/organizations/{organization_id}/devices/{device_id}/inspections"
     assert (path, "GET") in paths
     assert (path, "POST") in paths
