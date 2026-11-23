@@ -190,6 +190,10 @@ export function DevicesPage() {
   const syncEligibleDevices = selectedDevices.filter((device) =>
     isDeviceOnline(device, currentTime),
   )
+  const refreshEligibleDevices = selectedDevices.filter((device) =>
+    isDeviceOnline(device, currentTime),
+  )
+
   const lockUnsupportedDevices = selectedDevices.filter(
     (device) =>
       isDeviceOnline(device, currentTime) && !device.supports_device_lock,
@@ -446,6 +450,22 @@ export function DevicesPage() {
               >
                 <RefreshCw aria-hidden="true" size={16} />
                 Sync selected ({syncEligibleDevices.length})
+              </button>
+              <button
+                className="secondary-button"
+                disabled={refreshEligibleDevices.length === 0 || bulkActionRunning}
+                onClick={() =>
+                  void runBulkCommand(
+                    'Refresh apps',
+                    'REFRESH_APPS',
+                    refreshEligibleDevices,
+                  )
+                }
+                type="button"
+                title="Queue a fresh application inventory on selected online scanners"
+              >
+                <RefreshCw aria-hidden="true" size={16} />
+                Refresh apps ({refreshEligibleDevices.length})
               </button>
               <button
                 className="primary-button"
